@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Live Watchlist{% endblock %}
+
+{% block content %}
+    <div id="root"></div>
+{% endblock %}
+
+{% block extra_js %}
+    <link rel="stylesheet" href="{% static 'react-watchlist.css' %}">
+    <script type="module" src="{% static 'react-watchlist.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Magnificent 7 Stocks{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <h1>Magnificent 7</h1>
+    <p class="subtitle">Top tech stocks at a glance</p>
+</div>
+
+<section id="panel-stocks" class="tab-panel">
+    <article class="mag7-section">
+        <figure class="table-container">
+            <table>
+                <thead>
+                <tr>
+                    <th scope="col">Symbol</th>
+                    <th scope="col">Company</th>
+                    <th scope="col" class="num">Price</th>
+                    <th scope="col" class="num">Change</th>
+                    <th scope="col" class="num">% Change</th>
+                    <th scope="col" class="num">Volume</th>
+                    <th scope="col" class="num">Market Cap</th>
+                    <th scope="col" class="num">P/E Ratio</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for stock in mag7 %}
+                <tr>
+                    <td class="symbol-cell">
+                        <strong>{{ stock.symbol }}</strong>
+                    </td>
+                    <td class="name-cell">{{ stock.name }}</td>
+                    <td class="num price-cell">${{ stock.price }}</td>
+                    <td class="num">
+                        <span class="change-val {% if stock.change >= 0 %}positive{% else %}negative{% endif %}">
+                            ${{ stock.change }}
+                        </span>
+                    </td>
+                    <td class="num">
+                        <span class="change-val {% if stock.change_pct >= 0 %}positive{% else %}negative{% endif %}">
+                            {{ stock.change_pct }}%
+                        </span>
+                    </td>
+                    <td class="num volume-cell">
+                        {% if stock.volume %}
+                        {{ stock.volume|intcomma }}
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                    <td class="num market-cap-cell">
+                        {% if stock.market_cap %}
+                        ${{ stock.market_cap|intcomma }}
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                    <td class="num pe-cell">
+                        {% if stock.pe_ratio != 'N/A' %}
+                        {{ stock.pe_ratio }}
+                        {% else %}
+                        N/A
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="empty-state">⚠️ No stock data available</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </figure>
+    </article>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+    /* Dashboard Header */
+    .dashboard-header {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding: 2rem 1rem;
+        background: linear-gradient(135deg, #1095c1 0%, #0d7fa3 100%);
+        color: white;
+        border-radius: var(--pico-border-radius);
+    }
+
+    .dashboard-header h1 {
+        margin: 0 0 0.5rem 0;
+        color: white;
+        font-size: 2rem;
+    }
+
+    .subtitle {
+        margin: 0;
+        opacity: 0.95;
+        font-size: 1.1rem;
+    }
+
+    /* Magnificient 7 Section */
+    .mag7-section {
+        margin-bottom: 2rem;
+    }
+
+    .table-container {
+        overflow-x: auto;
+        margin: 0;
+        border-radius: var(--pico-border-radius);
+        border: 1px solid var(--pico-card-border-color);
+    }
+
+    /* Table Styles */
+    table {
+        margin: 0;
+        width: 100%;
+    }
+
+    tbody tr {
+        transition: background-color 0.2s ease;
+    }
+
+    tbody tr:hover {
+        background-color: var(--pico-table-row-stripped-background-color);
+        box-shadow: inset 0 0 0 1px var(--pico-card-border-color);
+    }
+
+    /* Cell Styles */
+    .symbol-cell {
+        text-transform: uppercase;
+        font-weight: 700;
+        color: var(--pico-primary);
+        letter-spacing: 0.5px;
+        width: 100px;
+    }
+
+    .name-cell {
+        white-space: nowrap;
+        font-weight: 500;
+        color: var(--pico-color);
+        min-width: 180px;
+    }
+
+    .price-cell {
+        font-weight: 600;
+        font-size: 1.05rem;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Change Values */
+    .change-val {
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        border-radius: 4px;
+        padding: 0.35rem 0.7rem;
+        display: inline-block;
+        white-space: nowrap;
+    }
+
+    .change-val.positive {
+        background-color: rgba(76, 175, 80, 0.1);
+        color: #2d7d46;
+    }
+
+    .change-val.negative {
+        background-color: rgba(239, 83, 80, 0.1);
+        color: #c62828;
+    }
+
+    .change-val.positive::before {
+        content: '▲ ';
+        font-size: 0.75rem;
+        margin-right: 0.25rem;
+    }
+
+    .change-val.negative::before {
+        content: '▼ ';
+        font-size: 0.75rem;
+        margin-right: 0.25rem;
+    }
+
+    /* Volume and Market Cap */
+    .volume-cell, .market-cap-cell {
+        font-size: 0.95rem;
+    }
+
+    .pe-cell {
+        font-weight: 600;
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: var(--pico-muted-color);
+        font-style: italic;
+    }
+
+    /* Utility */
+    .hidden { display: none !important; }
+
+    /* Dark Mode */
+    @media (prefers-color-scheme: dark) {
+        .dashboard-header {
+            background: linear-gradient(135deg, #0d7fa3 0%, #095d7a 100%);
+        }
+
+        .change-val.positive {
+            background-color: rgba(76, 175, 80, 0.15);
+            color: #4caf50;
+        }
+
+        .change-val.negative {
+            background-color: rgba(239, 83, 80, 0.15);
+            color: #ef5350;
+        }
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+        .name-cell {
+            min-width: 150px;
+            font-size: 0.95rem;
+        }
+
+        .volume-cell, .market-cap-cell {
+            font-size: 0.85rem;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .dashboard-header h1 {
+            font-size: 1.5rem;
+        }
+
+        .symbol-cell {
+            width: auto;
+        }
+
+        table {
+            font-size: 0.85rem;
+        }
+
+        .change-val {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .name-cell {
+            min-width: 120px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .table-container {
+            font-size: 0.75rem;
+        }
+
+        .change-val {
+            padding: 0.2rem 0.4rem;
+            font-size: 0.75rem;
+        }
+
+        .change-val::before {
+            display: none;
+        }
+
+        .name-cell {
+            font-size: 0.8rem;
+        }
+    }
+</style>
+{% endblock %}

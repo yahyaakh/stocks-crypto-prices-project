@@ -1,0 +1,108 @@
+/* 1. MAIN CONTAINER: Keeps everything centered and pushes footer down */
+.app-container {
+  max-width: 600px;
+  margin: 0 auto;     /* Centers the box horizontally */
+  text-align: center;
+  padding: 2rem 0;
+  min-height: 60vh;   /* CRITICAL: Ensures app is tall enough so footer stays at bottom */
+}
+
+/* 2. TITLE CARD: Adds the nice dark background and glow */
+.title {
+  background-color: #11191f;
+  color: #00acc1;
+  padding: 20px;
+  border-radius: 15px;
+  margin-bottom: 30px;
+  font-size: 2.5rem;
+  box-shadow: 0 0 20px rgba(0, 172, 193, 0.2);
+}
+
+/* --- NEW INFO BOX STYLES --- */
+.info-box {
+  background-color: #1e262e; /* Dark grey card */
+  border-left: 5px solid #00acc1; /* Cyan accent bar */
+  padding: 15px 20px;
+  margin-bottom: 30px;
+  border-radius: 8px;
+  text-align: left; /* Align text to left for better reading */
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  font-size: 0.95rem;
+  color: #e0e0e0;
+}
+
+.info-box p {
+  margin: 0 0 10px 0;
+  font-size: 1.1rem;
+  color: #fff;
+}
+
+.info-box ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style-type: none; /* Remove default bullets */
+}
+
+.info-box li {
+  margin-bottom: 5px;
+}
+/* --------------------------- */
+
+
+
+
+/* 3. SEARCH BOX: Aligns Input and Button perfectly */
+.search-box {
+  display: flex;       /* Puts them in a row */
+  gap: 10px;           /* Space between them */
+  justify-content: center;
+  align-items: stretch; /* Forces them to be the exact same height */
+  margin-bottom: 40px;
+}
+
+.search-box input {
+  max-width: 300px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background-color: #1e262e;
+  color: white;
+  margin-bottom: 0;    /* Fixes PicoCSS default margin issue */
+}
+
+.search-box button {
+  padding: 12px 24px;
+  background-color: #00acc1;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: transform 0.2s;
+}
+
+.search-box button:hover {
+  transform: scale(1.05);
+  background-color: #00bcd4;
+}
+
+/* 4. STOCK GRID: Organizes cards */
+.stock-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 20px;
+}
+
+.stock-card {
+  background-color: #1e262e;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+  color: white;
+}
+
+/* 5. UTILITIES */
+.error-msg { color: #ff6b6b; font-weight: bold; margin-bottom: 20px; }
+.green { color: #4cd964; }
+.red { color: #ff3b30; }
+.price { font-size: 1.8rem; font-weight: bold; margin: 10px 0; }

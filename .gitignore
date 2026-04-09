@@ -1,0 +1,39 @@
+@"
+# Secrets — never commit these
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# Virtual environments
+.venv/
+myenv/
+venv/
+env/
+
+# Django
+db.sqlite3
+staticfiles_production/
+media/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Node
+node_modules/
+ReactFolder/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+"@ | Out-File -FilePath .gitignore -Encoding utf8

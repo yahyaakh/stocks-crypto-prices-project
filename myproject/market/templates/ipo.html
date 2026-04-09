@@ -1,0 +1,476 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}IPO Calendar - Market Mini{% endblock %}
+
+{% block content %}
+<div class="ipo-page">
+    <!-- Header -->
+    <div class="ipo-header">
+        <h1>📅 IPO Calendar</h1>
+        <p class="subtitle">Upcoming Initial Public Offerings</p>
+        <div class="date-range">
+            <span class="date-badge">
+                <span class="badge-icon">📆</span>
+                Today - Next 12 Months
+            </span>
+        </div>
+    </div>
+
+
+    <!-- IPO Table -->
+    <section class="ipo-table-section">
+        {% if ipo %}
+        <div class="table-controls">
+            <input type="search" id="ipo-search" placeholder="Search by company, symbol, or exchange..." class="search-input">
+            <select id="exchange-filter" class="filter-select">
+                <option value="">All Exchanges</option>
+                <option value="NYSE">NYSE</option>
+                <option value="NASDAQ">NASDAQ</option>
+                <option value="NASDAQ Capital">NASDAQ Capital</option>
+                <option value="NASDAQ Global">NASDAQ Global</option>
+            </select>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="ipo-table">
+                <thead>
+                <tr>
+                    <th scope="col">Date</th>
+                    <th scope="col">Company</th>
+                    <th scope="col">Symbol</th>
+                    <th scope="col">Exchange</th>
+                    <th scope="col" class="num">Shares</th>
+                    <th scope="col" class="num">Price Range</th>
+                    <th scope="col" class="num">Expected Value</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in ipo %}
+                <tr class="ipo-row" data-exchange="{{ row.exchange }}">
+                    <td class="date-cell">
+                        <div class="date-display">
+                            <span class="date">{{ row.date }}</span>
+                        </div>
+                    </td>
+                    <td class="company-cell">
+                        <strong>{{ row.name }}</strong>
+                    </td>
+                    <td class="symbol-cell">
+                        <span class="symbol-badge">{{ row.symbol }}</span>
+                    </td>
+                    <td class="exchange-cell">
+                        <span class="exchange-tag">{{ row.exchange }}</span>
+                    </td>
+                    <td class="num shares-cell">
+                        {% if row.numberOfShares %}
+                        {{ row.numberOfShares|intcomma }}
+                        {% else %}
+                        <span class="na-text">TBA</span>
+                        {% endif %}
+                    </td>
+                    <td class="num price-cell">
+                        {% if row.price %}
+                        <span class="price-range">${{ row.price }}</span>
+                        {% else %}
+                        <span class="na-text">TBA</span>
+                        {% endif %}
+                    </td>
+                    <td class="num value-cell">
+                        {% if row.totalSharesValue %}
+                        <span class="value-amount">${{ row.totalSharesValue|intcomma }}</span>
+                        {% else %}
+                        <span class="na-text">TBA</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">📭</div>
+            <h2>No Upcoming IPOs</h2>
+            <p>There are no scheduled IPOs in the next 12 months.</p>
+            <p class="empty-hint">Check back later for updates!</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- Info Card -->
+    <aside class="info-card">
+        <h3>💡 About IPO Calendar</h3>
+        <p>This calendar shows companies planning to go public in the next 12 months. IPO information includes:</p>
+        <ul>
+            <li><strong>Date:</strong> Expected listing date</li>
+            <li><strong>Price Range:</strong> Expected initial share price</li>
+            <li><strong>Expected Value:</strong> Total value of shares being offered</li>
+        </ul>
+        <p class="info-note">⚠️ <em>Note: Dates and prices are subject to change. Always verify with official sources.</em></p>
+    </aside>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+    /* Container */
+    .ipo-page {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 1rem;
+    }
+
+    /* Header */
+    .ipo-header {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding: 2rem 1rem;
+        background: linear-gradient(135deg, #1095c1 0%, #0d7fa3 100%);
+        color: white;
+        border-radius: var(--pico-border-radius);
+    }
+
+    .ipo-header h1 {
+        margin: 0 0 0.5rem 0;
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: white;
+    }
+
+    .subtitle {
+        margin: 0 0 1rem 0;
+        opacity: 0.95;
+        font-size: 1.2rem;
+    }
+
+    .date-range {
+        display: inline-block;
+        margin-top: 1rem;
+    }
+
+    .date-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(255, 255, 255, 0.2);
+        padding: 0.5rem 1.5rem;
+        border-radius: 2rem;
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    .badge-icon {
+        font-size: 1.2rem;
+    }
+
+    /* Table */
+    .ipo-table-section {
+        margin-bottom: 3rem;
+    }
+
+    .table-wrapper {
+        overflow-x: auto;
+        background: var(--pico-card-background-color);
+        border: 1px solid var(--pico-card-border-color);
+        border-radius: var(--pico-border-radius);
+    }
+
+    .ipo-table {
+        width: 100%;
+        margin: 0;
+    }
+
+    .ipo-table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .ipo-table th {
+        padding: 1rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+    }
+
+    .ipo-table tbody tr {
+        border-bottom: 1px solid var(--pico-card-border-color);
+        transition: background-color 0.2s ease;
+    }
+
+    .ipo-table tbody tr:hover {
+        background-color: var(--pico-table-row-stripped-background-color);
+    }
+
+    .ipo-table td {
+        padding: 1.25rem 1rem;
+    }
+
+    /* Date Cell */
+    .date-cell {
+        width: 100px;
+    }
+
+    .date-display {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.50rem;
+    }
+
+    .date-day {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--pico-primary);
+        line-height: 2;
+    }
+
+    .date-month {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: var(--pico-muted-color);
+        letter-spacing: 1px;
+    }
+
+    /* Company Cell */
+    .company-cell {
+        font-weight: 500;
+        min-width: 200px;
+    }
+
+    /* Symbol Cell */
+    .symbol-cell {
+        width: 100px;
+    }
+
+    .symbol-badge {
+        display: inline-block;
+        background: var(--pico-primary);
+        color: white;
+        padding: 0.35rem 0.75rem;
+        border-radius: 0.5rem;
+        font-weight: 700;
+        font-size: 0.9rem;
+        letter-spacing: 0.5px;
+    }
+
+    /* Exchange Cell */
+    .exchange-tag {
+        display: inline-block;
+        background: var(--pico-form-element-background-color);
+        padding: 0.35rem 0.75rem;
+        border-radius: 0.5rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--pico-color);
+        border: 1px solid var(--pico-card-border-color);
+    }
+
+    /* Number Cells */
+    .num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .shares-cell {
+        font-weight: 600;
+    }
+
+    .price-range {
+        color: var(--pico-primary);
+        font-weight: 700;
+    }
+
+    .value-amount {
+        color: #2d7d46;
+        font-weight: 700;
+    }
+
+    .na-text {
+        color: var(--pico-muted-color);
+        font-style: italic;
+        font-size: 0.9rem;
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: var(--pico-card-background-color);
+        border: 1px solid var(--pico-card-border-color);
+        border-radius: var(--pico-border-radius);
+    }
+
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+
+    .empty-state h2 {
+        margin-bottom: 1rem;
+        color: var(--pico-color);
+    }
+
+    .empty-state p {
+        color: var(--pico-muted-color);
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-hint {
+        font-size: 0.9rem;
+        font-style: italic;
+    }
+
+    /* Info Card */
+    .info-card {
+        background: var(--pico-card-background-color);
+        border: 1px solid var(--pico-card-border-color);
+        border-radius: var(--pico-border-radius);
+        padding: 2rem;
+    }
+
+    .info-card h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        color: var(--pico-color);
+    }
+
+    .info-card ul {
+        margin: 1rem 0;
+        padding-left: 1.5rem;
+    }
+
+    .info-card li {
+        margin-bottom: 0.5rem;
+        line-height: 1.6;
+    }
+
+    .info-note {
+        margin-top: 1rem;
+        padding: 1rem;
+        background: var(--pico-form-element-background-color);
+        border-radius: var(--pico-border-radius);
+        font-size: 0.9rem;
+    }
+
+    /* Dark Mode */
+    @media (prefers-color-scheme: dark) {
+        .ipo-header {
+            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+        }
+
+        .value-amount {
+            color: #4caf50;
+        }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .ipo-header h1 {
+            font-size: 1.75rem;
+        }
+
+        .ipo-stats {
+            grid-template-columns: 1fr;
+        }
+
+        .table-controls {
+            flex-direction: column;
+        }
+
+        .search-input, .filter-select {
+            width: 100%;
+        }
+
+        .ipo-table {
+            font-size: 0.85rem;
+        }
+
+        .date-day {
+            font-size: 1.2rem;
+        }
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Search functionality
+        const searchInput = document.getElementById('ipo-search');
+        const exchangeFilter = document.getElementById('exchange-filter');
+        const rows = document.querySelectorAll('.ipo-row');
+
+        function filterTable() {
+        // 1. Get user input
+            const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+            const selectedExchange = exchangeFilter ? exchangeFilter.value : '';
+         // 2. Loop through every row currently on screen
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const exchange = row.dataset.exchange;
+                
+         // 3. Logic: Does it match the Search AND the Dropdown?
+                const matchesSearch = text.includes(searchTerm);
+                const matchesExchange = !selectedExchange || exchange === selectedExchange;
+
+                row.style.display = (matchesSearch && matchesExchange) ? '' : 'none';
+            });
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener('input', filterTable);
+        }
+
+        if (exchangeFilter) {
+            exchangeFilter.addEventListener('change', filterTable);
+        }
+
+        // Calculate stats
+        let totalValue = 0;
+        let priceCount = 0;
+        let priceSum = 0;
+
+        document.querySelectorAll('.value-cell .value-amount').forEach(el => {
+            const value = parseFloat(el.textContent.replace(/[$,]/g, ''));
+            if (!isNaN(value)) totalValue += value;
+        });
+
+        document.querySelectorAll('.price-cell .price-range').forEach(el => {
+            const priceText = el.textContent.replace(/[$]/g, '');
+            // Handle price ranges like "15.00-17.00"
+            const prices = priceText.split('-').map(p => parseFloat(p.trim()));
+            if (prices.length > 0 && !isNaN(prices[0])) {
+                const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+                priceSum += avgPrice;
+                priceCount++;
+            }
+        });
+
+        // Format total value
+        const totalValueEl = document.getElementById('total-value');
+        if (totalValueEl) {
+            if (totalValue > 0) {
+                if (totalValue >= 1e9) {
+                    totalValueEl.textContent = '$' + (totalValue / 1e9).toFixed(2) + 'B';
+                } else if (totalValue >= 1e6) {
+                    totalValueEl.textContent = '$' + (totalValue / 1e6).toFixed(2) + 'M';
+                } else {
+                    totalValueEl.textContent = '$' + totalValue.toLocaleString();
+                }
+            } else {
+                totalValueEl.textContent = 'TBA';
+            }
+        }
+
+        // Format average price
+        const avgPriceEl = document.getElementById('avg-price');
+        if (avgPriceEl) {
+            if (priceCount > 0) {
+                const avgPrice = priceSum / priceCount;
+                avgPriceEl.textContent = '$' + avgPrice.toFixed(2);
+            } else {
+                avgPriceEl.textContent = 'TBA';
+            }
+        }
+    });
+</script>
+{% endblock %}

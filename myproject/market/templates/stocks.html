@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+{% block title %}Stock Tools & Analysis - Market Mini{% endblock %}
+
+{% block content %}
+<div class="stocks-hub-page">
+    <!-- Header -->
+    <div class="stocks-hub-header">
+        <h1>Stock Analysis Hub</h1>
+        <p class="subtitle">Comprehensive tools for stock research and analysis</p>
+    </div>
+
+    <!-- Tools Grid -->
+    <div class="tools-grid">
+        <!-- Magnificent 7 -->
+        <a href="{% url 'mag7' %}" class="tool-card">
+            <div class="tool-content">
+                <h3>Magnificent 7</h3>
+                <p>Track the biggest tech giants: Apple, Microsoft, Amazon, Google, Meta, Tesla, and NVIDIA</p>
+            </div>
+        </a>
+
+        <!-- ETFs -->
+        <a href="{% url 'etf' %}" class="tool-card">
+            <div class="tool-content">
+                <h3>ETFs & Index Funds</h3>
+                <p>Browse S&P 500, core ETFs, and major index funds with real-time pricing</p>
+                <div class="tool-meta">
+                </div>
+            </div>
+        </a>
+
+        <!-- Stock Info -->
+        <a href="{% url 'info' %}" class="tool-card">
+            <div class="tool-content">
+                <h3>Stock Information</h3>
+                <p>Detailed company data, financials, metrics, and key statistics for any stock</p>
+                <div class="tool-meta">
+                </div>
+            </div>
+        </a>
+
+        <!-- Price Target -->
+        <a href="{% url 'target' %}" class="tool-card">
+            <div class="tool-content">
+                <h3>Analyst Price Targets</h3>
+                <p>See Wall Street analyst predictions and price targets for stocks</p>
+                <div class="tool-meta">
+                </div>
+            </div>
+        </a>
+
+        <!-- Stock News -->
+        <a href="{% url 'stocknews' %}" class="tool-card">
+            <div class="tool-content">
+                <h3>Stock News</h3>
+                <p>Latest news, press releases, and updates for individual companies</p>
+
+            </div>
+        </a>
+
+        <!-- IPO Calendar -->
+        <a href="{% url 'stocks_ipo' %}" class="tool-card">
+            <div class="tool-content">
+                <h3>IPO Calendar</h3>
+                <p>Track upcoming initial public offerings over the next 12 months</p>
+
+            </div>
+        </a>
+    </div>
+
+
+
+
+    <!-- Quick Links -->
+    <section class="quick-links-section">
+        <h2>Popular Searches</h2>
+        <div class="quick-links">
+            <a href="{% url 'info' %}?symbol=AAPL" class="quick-link-btn">
+                Apple (AAPL)
+            </a>
+            <a href="{% url 'info' %}?symbol=MSFT" class="quick-link-btn">
+                Microsoft (MSFT)
+            </a>
+            <a href="{% url 'info' %}?symbol=GOOGL" class="quick-link-btn">
+                Google (GOOGL)
+            </a>
+            <a href="{% url 'info' %}?symbol=TSLA" class="quick-link-btn">
+                Tesla (TSLA)
+            </a>
+            <a href="{% url 'info' %}?symbol=NVDA" class="quick-link-btn">
+                NVIDIA (NVDA)
+            </a>
+
+            </a>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+    /* Container */
+    .stocks-hub-page {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 1rem;
+    }
+     
+    /* Header , This styles the big blue section at the top.*/
+    .stocks-hub-header {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding: 3rem 1rem 2rem;
+        background: linear-gradient(135deg, #1095c1 0%, #0d7fa3 100%);
+        color: white;
+        border-radius: var(--pico-border-radius);
+    }
+
+    .stocks-hub-header h1 {
+        margin: 0 0 0.75rem 0;
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: white;
+    }
+
+    .subtitle {
+        margin: 0;
+        opacity: 0.95;
+        font-size: 1.2rem;
+    }
+
+    /* Quick Stats */
+    .quick-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+    }
+
+    .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        background: var(--pico-card-background-color);
+        border: 1px solid var(--pico-card-border-color);
+        border-radius: var(--pico-border-radius);
+        padding: 1.5rem;
+    }
+
+    .stat-icon {
+        font-size: 2.5rem;
+        flex-shrink: 0;
+    }
+
+    .stat-number {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--pico-primary);
+        line-height: 1;
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-label {
+        font-size: 0.9rem;
+        color: var(--pico-muted-color);
+    }
+
+    /* Tools Grid */
+    /* These are the boxes */ 
+    .tools-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+    }
+
+    .tool-card {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        background: var(--pico-card-background-color);
+        border: 2px solid var(--pico-card-border-color);
+        border-radius: var(--pico-border-radius);
+        padding: 2rem;
+        text-decoration: none;
+        color: var(--pico-color);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .tool-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: var(--pico-primary);
+        transform: scaleY(0);
+        transition: transform 0.3s ease;
+    }
+
+    .tool-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        border-color: var(--pico-primary);
+    }
+
+    .tool-card:hover::before {
+        transform: scaleY(1);
+    }
+
+    .tool-icon {
+        font-size: 3rem;
+        flex-shrink: 0;
+    }
+
+    .tool-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .tool-content h3 {
+        margin: 0 0 0.5rem 0;
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: var(--pico-color);
+    }
+
+    .tool-content p {
+        margin: 0 0 1rem 0;
+        color: var(--pico-muted-color);
+        line-height: 1.5;
+    }
+
+    .tool-meta {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .meta-badge {
+        display: inline-block;
+        background: var(--pico-primary);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .tool-arrow {
+        font-size: 1.5rem;
+        color: var(--pico-primary);
+        font-weight: 700;
+        flex-shrink: 0;
+        transition: transform 0.3s ease;
+    }
+
+    .tool-card:hover .tool-arrow {
+        transform: translateX(5px);
+    }
+
+
+    /* Quick Links Section */
+    .quick-links-section {
+        background: var(--pico-card-background-color);
+        border: 1px solid var(--pico-card-border-color);
+        border-radius: var(--pico-border-radius);
+        padding: 2rem;
+    }
+
+    .quick-links-section h2 {
+        margin-top: 0;
+        margin-bottom: 1.5rem;
+        font-size: 1.5rem;
+        font-weight: 600;
+    }
+
+    .quick-links {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .quick-link-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.25rem;
+        background: var(--pico-form-element-background-color);
+        border: 2px solid var(--pico-card-border-color);
+        border-radius: var(--pico-border-radius);
+        color: var(--pico-color);
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+
+
+    /* This CSS code creates an interactive hover effect for the quick link buttons  */ 
+    .quick-link-btn:hover {
+        background: var(--pico-primary);
+        border-color: var(--pico-primary);
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .link-icon {
+        font-size: 1.2rem;
+    }
+
+    /* Dark Mode */
+    @media (prefers-color-scheme: dark) {
+        .stocks-hub-header {
+            background: linear-gradient(135deg, #0d7fa3 0%, #095d7a 100%);
+        }
+    }
+
+
+    /* makes the page adapts to different screen sizes , works on mobile devices as well*/ 
+    /* Responsive */
+    @media (max-width: 768px) {
+        .stocks-hub-header h1 {
+            font-size: 1.75rem;
+        }
+
+        .tools-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .quick-stats {
+            grid-template-columns: 1fr;
+        }
+
+        .features-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .tool-card {
+            padding: 1.5rem;
+        }
+
+        .tool-icon {
+            font-size: 2.5rem;
+        }
+
+        .quick-links {
+            flex-direction: column;
+        }
+
+        .quick-link-btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock %}
