@@ -231,3 +231,19 @@ def test_trend_falls_back_to_yahoo_relative_months(settings, monkeypatch):
     assert out["source"] == "yahoo"
     assert [m["period"] for m in out["months"]] == ["2025-11", "2025-12", "2026-01"]  # crosses the year boundary
     assert out["months"][-1]["strong_buy"] == 4
+
+
+def test_yf_overview_includes_key_statistics_and_profile(monkeypatch):
+    info = {"currentPrice": 100.0, "longName": "Acme", "marketCap": 3.5e12, "trailingPE": 30.1, "forwardPE": 25.0,
+            "trailingEps": 3.3, "beta": 1.1, "dividendYield": 0.44, "averageDailyVolume3Month": 5_000_000,
+            "regularMarketDayLow": 98.0, "regularMarketDayHigh": 101.0, "longBusinessSummary": "Makes things.",
+            "website": "https://acme.example"}
+    t = mock.MagicMock(info=info, analyst_price_targets={"low": 80, "high": 150, "mean": 120, "median": 118},
+                       recommendations=None, ticker="ACME")
+    monkeypatch.setattr(stocksOverview.yf, "Ticker", lambda s: t)
+    o = stocksOverview.get_stock_overview_yf("ACME")
+    assert (o["market_cap"], o["pe_ttm"], o["pe_forward"], o["eps_ttm"], o["beta"]) == (3.5e12, 30.1, 25.0, 3.3, 1.1)
+    assert o["dividend_yield_pct"] == 0.44 and o["avg_volume"] == 5_000_000
+    assert (o["day_low"], o["day_high"]) == (98.0, 101.0)
+    assert o["summary"] == "Makes things." and o["website"] == "https://acme.example"
+    assert (o["target_low"], o["target_median"], o["target_high"]) == (80, 118, 150)

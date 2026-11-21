@@ -11,6 +11,12 @@
         /* Pico joins a search input and its button into one pill; keep the button on one line
            so it doesn't grow taller than the input. */
         form[role="search"] button { white-space: nowrap; width: auto; padding-inline: 1.25rem; }
+        /* Header: wraps on narrow screens instead of clipping; compact symbol search. */
+        header nav { flex-wrap: wrap; gap: .25rem 1rem; }
+        header nav ul { flex-wrap: wrap; }
+        .brand { color: inherit; text-decoration: none; }
+        .nav-search { margin: 0; }
+        .nav-search input { margin: 0; height: 2.4rem; padding: .3rem .8rem; width: 11rem; font-size: .9rem; }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
@@ -20,13 +26,20 @@
 <header class="container">
     <nav>
         <ul>
-            <li><strong>Market Watch</strong></li>
+            <li><a href="{% url 'home' %}" class="brand"><strong>Market Watch</strong></a></li>
         </ul>
 
         <ul>
             <li><a href="{% url 'home' %}">Home</a></li>
-            <li><a href="{% url 'stocks' %}">Stocks</a></li>
+            <li><a href="{% url 'stocks' %}">Research</a></li>
             <li><a href="{% url 'Live' %}" role="button" class="outline">Live Watchlist</a></li>
+            <li>
+                {# Enter submits; the server redirects to /live/stock/<SYMBOL>, so it works without JS. #}
+                <form action="{% url 'stock_lookup' %}" method="get" class="nav-search">
+                    <input type="search" name="symbol" placeholder="Symbol, e.g. AAPL" aria-label="Look up a stock by symbol"
+                           autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+                </form>
+            </li>
         </ul>
     </nav>
 </header> 

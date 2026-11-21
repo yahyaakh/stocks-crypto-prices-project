@@ -104,6 +104,18 @@ def get_stock_overview_yf(symbol: str) -> dict:
         "target_low": targets.get("low"),
         "target_mean": targets.get("mean"),
         "target_median": targets.get("median"),
+        # Key statistics and profile (previously the separate /info/ page).
+        "market_cap": info.get("marketCap"),
+        "pe_ttm": info.get("trailingPE"),
+        "pe_forward": info.get("forwardPE"),
+        "eps_ttm": info.get("trailingEps"),
+        "beta": info.get("beta"),
+        "dividend_yield_pct": info.get("dividendYield"),  # yfinance >= 1.0: already in percent (0.44 = 0.44%)
+        "avg_volume": info.get("averageDailyVolume3Month") or info.get("averageVolume"),
+        "day_low": info.get("regularMarketDayLow"),
+        "day_high": info.get("regularMarketDayHigh"),
+        "summary": info.get("longBusinessSummary"),
+        "website": info.get("website"),
         "source": "yfinance",
     }
 
@@ -145,6 +157,18 @@ def get_stock_overview(symbol: str) -> dict:
         "target_low": target.get("targetLow"),
         "target_mean": target.get("targetConsensus"),
         "target_median": target.get("targetMedian"),
+        # FMP's profile/quote have no P/E, EPS or dividend yield; the page shows "—" for those.
+        "market_cap": quote.get("marketCap") or profile.get("marketCap"),
+        "pe_ttm": None,
+        "pe_forward": None,
+        "eps_ttm": None,
+        "beta": profile.get("beta"),
+        "dividend_yield_pct": None,
+        "avg_volume": profile.get("averageVolume"),
+        "day_low": quote.get("dayLow"),
+        "day_high": quote.get("dayHigh"),
+        "summary": profile.get("description"),
+        "website": profile.get("website"),
         "source": "fmp",
     }
 

@@ -10,8 +10,11 @@ urlpatterns = [
     path("mag7/", views.magnificent7_view, name="mag7"),
     path("etfs/", views.etf, name="etf"),
     path("stocks/", views.stocks_page, name="stocks"),
-    path("info/", views.stock_detail, name="info"),
-    path("target/", views.price_target, name="target"),
+    # One page per stock (the React overview). These redirect to /live/stock/<SYMBOL>.
+    path("stock/", views.stock_lookup, name="stock_lookup"),
+    path("stock/<str:symbol>/", views.stock_lookup, name="stock"),
+    path("info/", views.stock_lookup),     # retired page: key statistics now on the overview
+    path("target/", views.stock_lookup),   # retired page: price targets now on the overview
     path("stocknews/", views.stock_news, name="stocknews"),
     path("ipo/", views.stocks_ipo, name="stocks_ipo"),
     path("live/", views.live_watch_view, name="Live"),

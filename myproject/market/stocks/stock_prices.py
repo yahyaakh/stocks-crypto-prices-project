@@ -10,20 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────
-#  Single-symbol helpers  (used by detail pages)
-# ─────────────────────────────────────────────
-
-def get_stock_information(symbol: str | None):
-    t = yf.Ticker(symbol)
-    return t.info
-
-
-def get_target_price(symbol: str | None):
-    s = yf.Ticker(symbol)
-    return s.analyst_price_targets
-
-
-# ─────────────────────────────────────────────
 #  ETF prices  (21 ETFs → 1 batch download)
 # ─────────────────────────────────────────────
 

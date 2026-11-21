@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams } from "react-router-dom"
 
 import {
   Card, Metric, Text, Badge, Grid,
@@ -14,10 +14,19 @@ const MAX_RATINGS = 20
 
 // ---- formatting helpers -------------------------------------------------
 const isNum = v => typeof v === "number" && Number.isFinite(v)
+// -0.44 -> "-$0.44" (not "$-0.44")
 const money = v => isNum(v)
-  ? "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  ? (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   : "—"
 const signedPct = v => isNum(v) ? (v > 0 ? "+" : "") + v.toFixed(2) + "%" : "—"
+// 3.61e12 -> "$3.61T"
+const compactMoney = v => {
+  if (!isNum(v)) return "—"
+  for (const [n, s] of [[1e12, "T"], [1e9, "B"], [1e6, "M"]]) if (Math.abs(v) >= n) return "$" + (v / n).toFixed(2) + s
+  return money(v)
+}
+const fixed2 = v => isNum(v) ? v.toFixed(2) : "—"
+const pctVs = (v, base) => isNum(v) && isNum(base) && base !== 0 ? ((v - base) / base) * 100 : null
 // "strong_buy" / "Strong_buy" -> "Strong Buy"
 const label = s => s ? String(s).replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "—"
 const ACTION_COLORS = { upgrade: "green", downgrade: "red", initiate: "blue" }
@@ -50,7 +59,6 @@ function ToneChip({ label: tone }) {
 
 export default function StockOverview() {
   const { symbol } = useParams()
-  const navigate = useNavigate()
   const [overview, setOverview] = useState(null)
   const [ratings, setRatings] = useState([])
   const [trend, setTrend] = useState(null)
@@ -59,7 +67,6 @@ export default function StockOverview() {
   const [period, setPeriod] = useState("1y")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
-  const [query, setQuery] = useState("")
 
   // Secondary panels load on their own, so a slow news feed never delays the main page.
   useEffect(() => {
@@ -105,30 +112,10 @@ export default function StockOverview() {
     return () => { cancelled = true }
   }, [symbol, period])
 
-  const search = (
-    <form
-      className="flex gap-2 mb-6"
-      onSubmit={e => {
-        e.preventDefault()
-        const s = query.trim().toUpperCase()
-        if (s) { navigate(`/stock/${encodeURIComponent(s)}`); setQuery("") }
-      }}
-    >
-      <input
-        type="text"
-        value={query}
-        onChange={e => setQuery(e.target.value)}
-        placeholder="Enter symbol e.g. AAPL"
-        aria-label="Stock symbol"
-        className="border rounded p-2 text-black"
-      />
-    </form>
-  )
-
-  if (loading) return <div className="p-6 max-w-6xl mx-auto">{search}<p style={{ color: "white" }}>Loading {symbol}…</p></div>
+  // Symbol search lives in the site header (base.html), so every page shares one search box.
+  if (loading) return <div className="p-6 max-w-6xl mx-auto"><p style={{ color: "white" }}>Loading {symbol}…</p></div>
   if (error) return (
     <div className="p-6 max-w-6xl mx-auto">
-      {search}
       <Card><Text>Could not load <strong>{symbol}</strong>: {error}</Text></Card>
     </div>
   )
@@ -142,11 +129,19 @@ export default function StockOverview() {
   const upside = isNum(o.target_mean) && isNum(o.price) && o.price !== 0
     ? ((o.target_mean - o.price) / o.price) * 100 : null
   const up = (o.change_pct ?? 0) >= 0
+  const stats = [
+    ["Market cap", compactMoney(o.market_cap)],
+    ["P/E (TTM)", fixed2(o.pe_ttm)],
+    ["Forward P/E", fixed2(o.pe_forward)],
+    ["EPS (TTM)", money(o.eps_ttm)],
+    ["Beta", fixed2(o.beta)],
+    ["Dividend yield", isNum(o.dividend_yield_pct) ? o.dividend_yield_pct.toFixed(2) + "%" : "—"],
+    ["Avg volume (3 mo)", isNum(o.avg_volume) ? o.avg_volume.toLocaleString("en-US") : "—"],
+    ["Day range", isNum(o.day_low) && isNum(o.day_high) ? `${money(o.day_low)} – ${money(o.day_high)}` : "—"],
+  ]
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      {search}
-
       <div className="flex gap-2 mb-2">
         {PERIODS.map(p => (
           <button
@@ -240,6 +235,18 @@ export default function StockOverview() {
         </Card>
       </Grid>
 
+      <Card className="mt-4">
+        <Text>Key statistics</Text>
+        <div className="mt-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: "14px 24px" }}>
+          {stats.map(([name, value]) => (
+            <div key={name}>
+              <div style={{ color: "#9ca3af", fontSize: "12px" }}>{name}</div>
+              <div style={{ color: "#f3f4f6", fontSize: "18px", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{value}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
       <Card className="mt-4" style={{ backgroundColor: "#1f2937" }}>
         <Text>Analyst Recommendations ({total} analysts)</Text>
         <div className="flex gap-6 mt-2">
@@ -315,13 +322,27 @@ export default function StockOverview() {
 
       {/* 12-month analyst price targets */}
       <Card className="mt-4">
-        <Text>12-Month Price Targets</Text>
-        <div className="flex justify-between mt-3">
-          <div><Text>Low</Text><Metric>{money(o.target_low)}</Metric></div>
-          <div><Text>Median</Text><Metric>{money(o.target_median)}</Metric></div>
-          <div><Text>Mean</Text><Metric>{money(o.target_mean)}</Metric></div>
-          <div style={{ textAlign: "right" }}><Text>High</Text><Metric>{money(o.target_high)}</Metric></div>
+        <Text>12-month analyst price targets (current price {money(o.price)})</Text>
+        <div className="flex justify-between flex-wrap gap-4 mt-3">
+          {[["Low", o.target_low], ["Median", o.target_median], ["Mean", o.target_mean], ["High", o.target_high]].map(([name, v]) => {
+            const d = pctVs(v, o.price)
+            return (
+              <div key={name}>
+                <Text>{name}</Text>
+                <Metric>{money(v)}</Metric>
+                {d !== null && (
+                  <span style={{ fontSize: "12px", fontWeight: 600, color: d >= 0 ? "#10b981" : "#ef4444" }}>
+                    {signedPct(d)} vs current
+                  </span>
+                )}
+              </div>
+            )
+          })}
         </div>
+        <Text className="mt-2" style={{ fontSize: "12px" }}>
+          Source: {o.source === "fmp" ? "Financial Modeling Prep" : "Yahoo Finance"} consensus. Targets are estimates
+          with a wide spread between analysts (compare high and low), not guarantees.
+        </Text>
       </Card>
 
       <Card className="mt-4">
@@ -353,6 +374,21 @@ export default function StockOverview() {
           </Table>
         )}
       </Card>
+
+      {o.summary && (
+        <Card className="mt-4">
+          <div className="flex justify-between items-center">
+            <Text>About {o.name}</Text>
+            {safeHref(o.website) && (
+              <a href={safeHref(o.website)} target="_blank" rel="noopener noreferrer" style={{ color: "#60a5fa", fontSize: "14px" }}>
+                Company website →
+              </a>
+            )}
+          </div>
+          {o.industry && <Text className="mt-1" style={{ fontSize: "12px" }}>{[o.sector, o.industry].filter(Boolean).join(" · ")}</Text>}
+          <p className="mt-3" style={{ color: "#d1d5db", fontSize: "14px", lineHeight: 1.6 }}>{o.summary}</p>
+        </Card>
+      )}
     </div>
   )
 }

@@ -1,9 +1,10 @@
 import logging
 import math
+import re
 
 import yfinance as yf
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.views.decorators.cache import cache_control, cache_page, never_cache
 from django.views.decorators.http import require_GET
 
@@ -12,8 +13,6 @@ from .stocks.IPO import show_ipo
 from .stocks.stock_prices import (
     get_biggest_etf_stock_prices,
     get_magnificent7_prices,
-    get_stock_information,
-    get_target_price,
 )
 from .news import company_news, market_news
 from .stocks.stocks_home_page import get_world_indices_tables
@@ -84,25 +83,31 @@ def etf(request):
     return render(request, "etfs.html", {"etfs": get_biggest_etf_stock_prices()})
 
 
+POPULAR_SYMBOLS = [("AAPL", "Apple"), ("MSFT", "Microsoft"), ("NVDA", "NVIDIA"), ("GOOGL", "Alphabet"),
+                   ("AMZN", "Amazon"), ("TSLA", "Tesla")]
+
+
 @cached(PAGE_TTL_S)
 def stocks_page(request):
-    return render(request, "stocks.html")
+    return render(request, "stocks.html", {"popular": POPULAR_SYMBOLS})
 
 
 def _symbol(request, default: str = "MSFT") -> str:
     return (request.GET.get("symbol") or default).strip().upper()
 
 
-@cached(PAGE_TTL_S)
-def stock_detail(request):
-    symbol = _symbol(request)
-    return render(request, "stock_detail.html", {"symbol": symbol, "info": get_stock_information(symbol)})
+# Tickers look like AAPL, BRK-B, BRK.B, ^GSPC, EURUSD=X. Anything else is not a symbol.
+_SYMBOL_RE = re.compile(r"^[A-Z0-9^][A-Z0-9.\-=^]{0,14}$")
 
 
-@cached(PAGE_TTL_S)
-def price_target(request):
-    symbol = _symbol(request)
-    return render(request, "price_target.html", {"symbol": symbol, "targets": get_target_price(symbol)})
+def stock_lookup(request, symbol: str = ""):
+    """One stock page: the React overview. The header search (?symbol=), /stock/AAPL and the
+    retired /info/ and /target/ pages all land here and redirect to /live/stock/<SYMBOL>.
+    Not permanent (302): the retired URLs may be reused later without stale browser redirects."""
+    s = (symbol or request.GET.get("symbol") or "").strip().upper()
+    if not _SYMBOL_RE.match(s):
+        return redirect("stocks")
+    return redirect(f"/live/stock/{s}")
 
 
 @cached(PAGE_TTL_S)

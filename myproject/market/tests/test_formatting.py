@@ -1,6 +1,6 @@
 import pytest
 
-from market.templatetags.market_format import compact_money, direction, money, pct_vs, signed_money, signed_pct
+from market.templatetags.market_format import compact_money, direction, money, signed_money, signed_pct
 
 
 @pytest.mark.parametrize("value, expected", [
@@ -12,13 +12,6 @@ from market.templatetags.market_format import compact_money, direction, money, p
 ])
 def test_compact_money(value, expected):
     assert compact_money(value) == expected
-
-
-def test_pct_vs():
-    assert pct_vs(110, 100) == pytest.approx(10.0)
-    assert pct_vs(90, 100) == pytest.approx(-10.0)
-    assert pct_vs(1, 0) is None
-    assert pct_vs(None, 100) is None
 
 
 @pytest.mark.parametrize("value, expected", [

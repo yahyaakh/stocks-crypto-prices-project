@@ -101,3 +101,26 @@ def test_browser_cache_is_short_even_when_server_cache_is_long(client, monkeypat
     monkeypatch.setattr(views, "get_analyst_ratings", lambda s: [])
     r = client.get("/api/stocks/MSFT/ratings/")
     assert "max-age=60" in r["Cache-Control"]
+
+
+# ---------- one page per stock ----------
+
+@pytest.mark.parametrize("path, target", [
+    ("/stock/?symbol=aapl", "/live/stock/AAPL"),          # header search box
+    ("/stock/brk-b/", "/live/stock/BRK-B"),
+    ("/stock/%5EGSPC/", "/live/stock/%5EGSPC"),          # Django percent-encodes ^; React Router decodes it
+    ("/info/?symbol=nvda", "/live/stock/NVDA"),           # retired pages keep working
+    ("/target/?symbol=MSFT", "/live/stock/MSFT"),
+    ("/stock/?symbol=", "/stocks/"),                      # not a symbol: back to Research
+    ("/stock/?symbol=%3Cscript%3E", "/stocks/"),
+    ("/info/", "/stocks/"),
+])
+def test_stock_lookup_redirects(client, path, target):
+    r = client.get(path)
+    assert r.status_code == 302 and r["Location"] == target
+
+
+def test_research_page_links_to_overview_and_not_retired_pages(client):
+    html = client.get("/stocks/").content.decode()
+    assert 'href="/live/stock/AAPL"' in html and 'action="/stock/"' in html
+    assert "/info/" not in html and "/target/" not in html

@@ -62,15 +62,6 @@ def compact_money(value) -> str:
 
 
 @register.filter
-def pct_vs(value, base):
-    """Percent difference of value relative to base: {{ target|pct_vs:price|signed_pct }}."""
-    v, b = _num(value), _num(base)
-    if v is None or b is None or b == 0:
-        return None
-    return (v - b) / b * 100.0
-
-
-@register.filter
 def direction(value) -> str:
     v = _num(value)
     if v is None:
