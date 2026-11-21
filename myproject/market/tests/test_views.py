@@ -20,6 +20,15 @@ def test_healthz(client):
     assert "no-cache" in r["Cache-Control"]
 
 
+def test_robots_txt_keeps_crawlers_off_per_symbol_pages(client):
+    r = client.get("/robots.txt")
+    assert r.status_code == 200 and r["Content-Type"].startswith("text/plain")
+    lines = r.content.decode().splitlines()
+    for prefix in ("/live/", "/stock/", "/stocknews/", "/api/"):
+        assert f"Disallow: {prefix}" in lines
+    assert "Disallow: /" not in lines  # the top-level pages stay crawlable
+
+
 def test_sanitize_floats_nested():
     out = views.sanitize_floats({"a": [1.0, float("nan")], "b": {"c": float("inf")}, "d": "x"})
     assert out == {"a": [1.0, None], "b": {"c": None}, "d": "x"}

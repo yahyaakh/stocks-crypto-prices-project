@@ -3,7 +3,7 @@ import math
 import re
 
 import yfinance as yf
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.cache import cache_control, cache_page, never_cache
 from django.views.decorators.http import require_GET
@@ -63,6 +63,26 @@ def _json_error(view: str, exc: Exception, status: int = 500) -> JsonResponse:
 def healthz(request):
     """Liveness probe: the process is up and serving. Does not call upstream APIs."""
     return JsonResponse({"status": "ok"})
+
+
+# Per-stock pages, news and the JSON API each fetch live data from upstream providers. Crawlers
+# walking every symbol kept the hosted container from scaling to zero, so they are kept to the
+# handful of top-level pages.
+ROBOTS_TXT = """User-agent: *
+Disallow: /live/
+Disallow: /stock/
+Disallow: /stocknews/
+Disallow: /api/
+Disallow: /info/
+Disallow: /target/
+"""
+
+
+@require_GET
+def robots_txt(request):
+    resp = HttpResponse(ROBOTS_TXT, content_type="text/plain")
+    resp["Cache-Control"] = "public, max-age=86400"
+    return resp
 
 
 # ---------- HTML pages ----------

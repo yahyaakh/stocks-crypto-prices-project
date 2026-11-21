@@ -209,7 +209,8 @@ All configuration comes from environment variables; see [`.env.example`](.env.ex
 
 ### Deployment
 
-The hosted app runs the production image on Azure Container Apps (0.25 vCPU, 0.5 GiB, scale 0–2).
+The hosted app runs the production image on Azure Container Apps (0.25 vCPU, 0.5 GiB, scale 0–1).
+`robots.txt` keeps crawlers off the per-symbol pages and the API, which otherwise kept the container awake.
 Before deploying, the image was run locally with the same limits (`--cpus 0.25 --memory 512m`):
 12 pages and API endpoints all returned 200 and memory peaked at 221 MiB (one pass, 2026-11-21).
 

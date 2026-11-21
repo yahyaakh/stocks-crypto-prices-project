@@ -5,6 +5,7 @@ from . import views
 # Route names let templates use {% url 'name' %} instead of hard-coded paths.
 urlpatterns = [
     path("healthz", views.healthz, name="healthz"),
+    path("robots.txt", views.robots_txt, name="robots_txt"),
     # HTML pages
     path("", views.home, name="home"),
     path("mag7/", views.magnificent7_view, name="mag7"),
