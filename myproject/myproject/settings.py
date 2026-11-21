@@ -27,9 +27,9 @@ if not SECRET_KEY:
         raise ImproperlyConfigured("SECRET_KEY must be set when DEBUG is False")
     SECRET_KEY = "django-insecure-local-dev-only"
 
-# Third-party API keys. Optional: features that need a missing key degrade to empty results.
+# Third-party API key. Optional: features that need it (news, IPOs, monthly analyst trend)
+# degrade to empty results or Yahoo data without it.
 FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "")
-FMP_API_KEY = os.environ.get("FMP_API_KEY", "")
 
 # News-tone model: "lexicon" (default, tiny) or "finbert" (needs requirements-finbert.txt; +2.3 GB image).
 SENTIMENT_MODEL = os.environ.get("SENTIMENT_MODEL", "lexicon")

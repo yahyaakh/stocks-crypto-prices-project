@@ -340,7 +340,7 @@ export default function StockOverview() {
           })}
         </div>
         <Text className="mt-2" style={{ fontSize: "12px" }}>
-          Source: {o.source === "fmp" ? "Financial Modeling Prep" : "Yahoo Finance"} consensus. Targets are estimates
+          Source: Yahoo Finance consensus. Targets are estimates
           with a wide spread between analysts (compare high and low), not guarantees.
         </Text>
       </Card>

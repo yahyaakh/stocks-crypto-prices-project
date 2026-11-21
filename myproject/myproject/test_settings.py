@@ -3,7 +3,6 @@ import os
 
 os.environ.setdefault("SECRET_KEY", "test-only-not-secret")
 os.environ["FINNHUB_API_KEY"] = ""
-os.environ["FMP_API_KEY"] = ""
 
 from .settings import *  # noqa: E402,F401,F403
 

@@ -1,17 +1,14 @@
-"""Single-stock overview: Financial Modeling Prep (FMP) first, yfinance as fallback."""
+"""Single-stock data: overview, analyst ratings and price history from yfinance; the monthly
+recommendation trend from Finnhub, with Yahoo as fallback."""
 
 import logging
 from datetime import date, timedelta
 
 import pandas as pd
-import requests
 import yfinance as yf
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
-
-FMP_BASE = "https://financialmodelingprep.com/stable"
-HTTP_TIMEOUT_S = 10
 
 # Chart period -> bar interval. Only combinations Yahoo accepts.
 HISTORY_INTERVALS = {
@@ -24,36 +21,6 @@ HISTORY_INTERVALS = {
     "5y": "1wk",
 }
 INTRADAY_INTERVALS = {"5m", "1h"}
-
-
-def _fmp_get(endpoint: str, symbol: str) -> list | None:
-    """GET one FMP endpoint. Returns a list of records, or None on any failure.
-
-    FMP answers errors (bad key, rate limit, unknown symbol) with HTTP 200 and a
-    JSON *object*; success is a JSON *list*. So we check the shape, not only the status.
-    """
-    key = settings.FMP_API_KEY
-    if not key:
-        return None
-    try:
-        resp = requests.get(
-            f"{FMP_BASE}/{endpoint}",
-            params={"symbol": symbol, "apikey": key},
-            timeout=HTTP_TIMEOUT_S,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    except (requests.RequestException, ValueError) as exc:
-        logger.warning("fmp request failed endpoint=%s symbol=%s err=%s", endpoint, symbol, exc)
-        return None
-    if not isinstance(data, list):
-        logger.warning("fmp unexpected payload endpoint=%s symbol=%s payload=%.200s", endpoint, symbol, data)
-        return None
-    return data
-
-
-def _first(records: list | None) -> dict:
-    return records[0] if records else {}
 
 
 def _yf_recommendation_counts(ticker: yf.Ticker) -> dict:
@@ -75,7 +42,8 @@ def _yf_recommendation_counts(ticker: yf.Ticker) -> dict:
     return counts
 
 
-def get_stock_overview_yf(symbol: str) -> dict:
+def get_stock_overview(symbol: str) -> dict:
+    symbol = symbol.upper()
     t = yf.Ticker(symbol)
     info = t.info or {}
     price = info.get("currentPrice") or info.get("regularMarketPrice")
@@ -96,8 +64,6 @@ def get_stock_overview_yf(symbol: str) -> dict:
         "volume": info.get("regularMarketVolume"),
         "year_high": info.get("fiftyTwoWeekHigh"),
         "year_low": info.get("fiftyTwoWeekLow"),
-        "financial_rating": "N/A",
-        "financial_score": None,
         **_yf_recommendation_counts(t),
         "consensus": (info.get("recommendationKey") or "n/a").capitalize(),
         "target_high": targets.get("high"),
@@ -120,87 +86,16 @@ def get_stock_overview_yf(symbol: str) -> dict:
     }
 
 
-def get_stock_overview(symbol: str) -> dict:
-    symbol = symbol.upper()
-
-    profile = _first(_fmp_get("profile", symbol))
-    quote = _first(_fmp_get("quote", symbol))
-    if not profile or not quote:
-        return get_stock_overview_yf(symbol)
-
-    rating = _first(_fmp_get("ratings-snapshot", symbol))
-    grades = _first(_fmp_get("grades-consensus", symbol))
-    target = _first(_fmp_get("price-target-consensus", symbol))
-
-    return {
-        "symbol": symbol,
-        "name": profile.get("companyName"),
-        "exchange": profile.get("exchange"),
-        "logo": profile.get("image"),
-        "sector": profile.get("sector"),
-        "industry": profile.get("industry"),
-        "price": quote.get("price"),
-        "change": quote.get("change"),
-        "change_pct": quote.get("changePercentage"),
-        "volume": quote.get("volume"),
-        "year_high": quote.get("yearHigh"),
-        "year_low": quote.get("yearLow"),
-        "financial_rating": rating.get("rating"),
-        "financial_score": rating.get("overallScore"),
-        "strong_buy": grades.get("strongBuy"),
-        "buy": grades.get("buy"),
-        "hold": grades.get("hold"),
-        "sell": grades.get("sell"),
-        "strong_sell": grades.get("strongSell"),
-        "consensus": grades.get("consensus"),
-        "target_high": target.get("targetHigh"),
-        "target_low": target.get("targetLow"),
-        "target_mean": target.get("targetConsensus"),
-        "target_median": target.get("targetMedian"),
-        # FMP's profile/quote have no P/E, EPS or dividend yield; the page shows "—" for those.
-        "market_cap": quote.get("marketCap") or profile.get("marketCap"),
-        "pe_ttm": None,
-        "pe_forward": None,
-        "eps_ttm": None,
-        "beta": profile.get("beta"),
-        "dividend_yield_pct": None,
-        "avg_volume": profile.get("averageVolume"),
-        "day_low": quote.get("dayLow"),
-        "day_high": quote.get("dayHigh"),
-        "summary": profile.get("description"),
-        "website": profile.get("website"),
-        "source": "fmp",
-    }
-
-
-def get_analyst_ratings(symbol: str, lookback_days: int = 365, today: date | None = None) -> list[dict]:
-    """Analyst grade changes over the last `lookback_days` (rolling window, not a hard-coded year)."""
-    symbol = symbol.upper()
-    cutoff = ((today or date.today()) - timedelta(days=lookback_days)).isoformat()
-    grades = _fmp_get("grades", symbol)
-    if grades is None:  # no FMP key, quota hit or error: same data from Yahoo
-        return get_analyst_ratings_yf(symbol, cutoff)
-
-    # ISO dates (YYYY-MM-DD) compare correctly as strings.
-    return [
-        {
-            "firm": g.get("gradingCompany"),
-            "date": g.get("date"),
-            "previous_grade": g.get("previousGrade"),
-            "new_grade": g.get("newGrade"),
-            "action": g.get("action"),
-        }
-        for g in grades
-        if (g.get("date") or "") >= cutoff
-    ]
-
-
-# Yahoo's short action codes -> the words FMP uses, so the frontend sees one vocabulary.
+# Yahoo's short action codes -> readable words for the frontend.
 YF_ACTIONS = {"up": "upgrade", "down": "downgrade", "main": "maintain", "init": "initiate", "reit": "reiterate"}
 
 
-def get_analyst_ratings_yf(symbol: str, cutoff: str) -> list[dict]:
-    """Analyst grade changes from yfinance, newest first, on or after `cutoff` (ISO date)."""
+def get_analyst_ratings(symbol: str, lookback_days: int = 365, today: date | None = None) -> list[dict]:
+    """Analyst grade changes from yfinance over the last `lookback_days` (rolling window, not a
+    hard-coded year), newest first."""
+    symbol = symbol.upper()
+    # ISO dates (YYYY-MM-DD) compare correctly as strings.
+    cutoff = ((today or date.today()) - timedelta(days=lookback_days)).isoformat()
     try:
         df = yf.Ticker(symbol).upgrades_downgrades
     except Exception as exc:  # yfinance raises a mix of its own and requests errors

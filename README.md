@@ -85,7 +85,7 @@ Full results, confusion matrices and live examples: [`docs/SENTIMENT_EVAL.md`](d
 - Engine: 24/24 test cases, including a differential test that runs 200,000 random operations against
   a slow, obviously correct reference book and stops at the first divergence. CI also runs them under
   AddressSanitizer + UndefinedBehaviorSanitizer.
-- Dashboard: 90 pytest tests (`pytest`, 3.9 s on the laptop above). Providers are mocked, so they run in
+- Dashboard: 84 pytest tests (`pytest`, 3.0 s on the laptop above). Providers are mocked, so they run in
   CI without API keys; they also all pass with every HTTP(S) request forced through a dead proxy.
 
 ---
@@ -116,7 +116,7 @@ Design notes and the reasoning behind each choice: [`engine/docs/ENGINE_GUIDE.md
 | Home: world indices, top 100 crypto, market news with tone summary | `/` | yfinance, CoinGecko, Finnhub + Yahoo |
 | Research hub: stock lookup, links to the lists below | `/stocks/` | – |
 | Magnificent 7, ETFs | `/mag7/`, `/etfs/` | yfinance |
-| Stock overview (React), the one page per stock: price chart, key statistics, analyst consensus, 12-month target range, rating changes, monthly recommendation trend, headline tone, company profile | `/live/stock/MSFT` | FMP (optional) → yfinance, Finnhub |
+| Stock overview (React), the one page per stock: price chart, key statistics, analyst consensus, 12-month target range, rating changes, monthly recommendation trend, headline tone, company profile | `/live/stock/MSFT` | yfinance, Finnhub |
 | Stock news: up to 60 articles, bullish/neutral/bearish filters, 7-day tone | `/stocknews/?symbol=MSFT` | Finnhub + Yahoo |
 | IPO calendar | `/ipo/` | Finnhub |
 
@@ -130,9 +130,9 @@ How it works:
   (keeping the direct publisher link over Finnhub's redirect) and sorted newest first. A stock's list
   covers 30 days, widened to 90 for quiet stocks with fewer than 20 articles; the tone summary always
   covers the last 7 days so it means the same thing for every stock.
-- **Fallbacks:** analyst data comes from FMP when a key is set, otherwise yfinance. The monthly
-  recommendation trend comes from Finnhub, falling back to Yahoo. Finnhub and Yahoo use different broker panels and
-  report different analyst counts, so the page labels the source.
+- **One source per number:** the overview, price targets and rating changes come from yfinance. The
+  monthly recommendation trend comes from Finnhub, falling back to Yahoo. Finnhub and Yahoo use different
+  broker panels and report different analyst counts, so the page labels the source.
 - **Caching:** server-side per-view cache, browser `max-age=60`.
 - **Concurrency fix:** yfinance keeps SQLite caches in one shared directory, which made concurrent
   gunicorn workers fail with `database is locked`; each worker process now gets its own cache directory.
@@ -204,7 +204,6 @@ All configuration comes from environment variables; see [`.env.example`](.env.ex
 | `SECRET_KEY` | Django secret, required when `DEBUG=False` |
 | `DEBUG`, `ALLOWED_HOSTS`, `LOG_LEVEL` | Usual Django settings |
 | `FINNHUB_API_KEY` | News, IPO calendar, recommendation trends (free tier). Without it those parts are empty |
-| `FMP_API_KEY` | Optional; preferred source for the stock overview |
 | `SENTIMENT_MODEL` | `lexicon` (default) or `finbert` |
 | `CACHE_WARMUP` | `1` pre-fills the cache after startup |
 
@@ -235,5 +234,5 @@ docs/              SENTIMENT_EVAL.md
 - Loughran-McDonald Master Dictionary (via the `pysentiment2` package's 2014 word lists).
 - Financial PhraseBank (Malo et al., 2014); Twitter Financial News Sentiment (zeroshot, MIT).
 - FinBERT: ProsusAI/finbert.
-- Market data from Yahoo Finance (via yfinance), Finnhub, CoinGecko and Financial Modeling Prep.
+- Market data from Yahoo Finance (via yfinance), Finnhub and CoinGecko.
   For personal and educational use; nothing here is investment advice.

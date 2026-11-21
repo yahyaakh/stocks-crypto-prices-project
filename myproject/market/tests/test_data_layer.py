@@ -61,13 +61,6 @@ def test_closed_market_uses_its_own_last_session():
     assert row["change"] == 5.0 and row["pct_change"] == 5.0
 
 
-# ---------- FMP client ----------
-
-@pytest.fixture
-def fmp_key(settings):
-    settings.FMP_API_KEY = "test-key"
-
-
 def _resp(payload, status=200):
     r = mock.Mock(status_code=status)
     r.json.return_value = payload
@@ -75,53 +68,11 @@ def _resp(payload, status=200):
     return r
 
 
-def test_fmp_get_without_key_makes_no_request(settings):
-    settings.FMP_API_KEY = ""
-    with mock.patch.object(stocksOverview.requests, "get") as get:
-        assert stocksOverview._fmp_get("quote", "AAPL") is None
-    get.assert_not_called()
+# ---------- analyst ratings ----------
 
-
-def test_fmp_get_treats_error_object_as_failure(fmp_key):
-    # FMP reports errors as HTTP 200 + a JSON object; the old code then crashed on profile[0].
-    with mock.patch.object(stocksOverview.requests, "get", return_value=_resp({"Error Message": "Limit reached"})):
-        assert stocksOverview._fmp_get("quote", "AAPL") is None
-
-
-def test_fmp_get_timeout_returns_none(fmp_key):
-    with mock.patch.object(stocksOverview.requests, "get", side_effect=requests.Timeout()):
-        assert stocksOverview._fmp_get("quote", "AAPL") is None
-
-
-def test_fmp_get_passes_timeout_and_key_as_params(fmp_key):
-    with mock.patch.object(stocksOverview.requests, "get", return_value=_resp([{"price": 1}])) as get:
-        assert stocksOverview._fmp_get("quote", "AAPL") == [{"price": 1}]
-    _, kwargs = get.call_args
-    assert kwargs["timeout"] == stocksOverview.HTTP_TIMEOUT_S
-    assert kwargs["params"] == {"symbol": "AAPL", "apikey": "test-key"}
-
-
-def test_overview_falls_back_to_yfinance_when_fmp_unavailable(monkeypatch):
-    monkeypatch.setattr(stocksOverview, "_fmp_get", lambda *a: None)
-    monkeypatch.setattr(stocksOverview, "get_stock_overview_yf", lambda s: {"symbol": s, "source": "yfinance"})
-    assert stocksOverview.get_stock_overview("aapl") == {"symbol": "AAPL", "source": "yfinance"}
-
-
-def test_analyst_ratings_use_rolling_window(monkeypatch):
-    grades = [
-        {"date": "2026-11-01", "gradingCompany": "A"},
-        {"date": "2025-11-21", "gradingCompany": "B"},  # inside 365 days of 2026-11-20
-        {"date": "2025-11-19", "gradingCompany": "C"},  # outside
-        {"gradingCompany": "D"},                          # no date
-    ]
-    monkeypatch.setattr(stocksOverview, "_fmp_get", lambda *a: grades)
-    firms = [g["firm"] for g in stocksOverview.get_analyst_ratings("AAPL", today=date(2026, 11, 20))]
-    assert firms == ["A", "B"]
-
-
-def test_analyst_ratings_fall_back_to_yfinance(monkeypatch):
-    """No FMP key -> grades come from Yahoo, newest first, action codes mapped, window applied."""
-    monkeypatch.setattr(stocksOverview, "_fmp_get", lambda *a: None)
+def test_analyst_ratings_newest_first_mapped_and_windowed(monkeypatch):
+    """Grades come from Yahoo, newest first, action codes mapped to words, 365-day window applied
+    (2025-01-02 is outside it)."""
     df = pd.DataFrame(
         {"Firm": ["Old Co", "RBC", "TD"], "ToGrade": ["Hold", "Buy", "Buy"],
          "FromGrade": ["", "Hold", "Buy"], "Action": ["main", "up", "reit"]},
@@ -233,7 +184,7 @@ def test_trend_falls_back_to_yahoo_relative_months(settings, monkeypatch):
     assert out["months"][-1]["strong_buy"] == 4
 
 
-def test_yf_overview_includes_key_statistics_and_profile(monkeypatch):
+def test_overview_includes_key_statistics_and_profile(monkeypatch):
     info = {"currentPrice": 100.0, "longName": "Acme", "marketCap": 3.5e12, "trailingPE": 30.1, "forwardPE": 25.0,
             "trailingEps": 3.3, "beta": 1.1, "dividendYield": 0.44, "averageDailyVolume3Month": 5_000_000,
             "regularMarketDayLow": 98.0, "regularMarketDayHigh": 101.0, "longBusinessSummary": "Makes things.",
@@ -241,7 +192,7 @@ def test_yf_overview_includes_key_statistics_and_profile(monkeypatch):
     t = mock.MagicMock(info=info, analyst_price_targets={"low": 80, "high": 150, "mean": 120, "median": 118},
                        recommendations=None, ticker="ACME")
     monkeypatch.setattr(stocksOverview.yf, "Ticker", lambda s: t)
-    o = stocksOverview.get_stock_overview_yf("ACME")
+    o = stocksOverview.get_stock_overview("acme")
     assert (o["market_cap"], o["pe_ttm"], o["pe_forward"], o["eps_ttm"], o["beta"]) == (3.5e12, 30.1, 25.0, 3.3, 1.1)
     assert o["dividend_yield_pct"] == 0.44 and o["avg_volume"] == 5_000_000
     assert (o["day_low"], o["day_high"]) == (98.0, 101.0)
