@@ -1,110 +1,97 @@
 {% extends "base.html" %}
-{% load humanize %}
 
-{% block title %}Stock News — {{ symbol|default:"Search" }}{% endblock %}
+{% block title %}Stock News — {{ symbol|default:"Search" }} - Market Watch{% endblock %}
 
 {% block content %}
-<section class="container" style="max-width: 1200px; margin: 0 auto; padding: 1rem;">
+<section style="max-width: 1200px; margin: 0 auto;">
 
-    <form method="get" class="grid" style="margin-bottom: 1.5rem;">
-        <input type="text" name="symbol" value="{{ symbol|default:'' }}" placeholder="e.g. MSFT" aria-label="Stock Symbol" required>
-        <button type="submit">Show News</button>
+    <form method="get" role="search" style="max-width: 500px; margin: 0 auto 1.5rem;">
+        <input type="search" name="symbol" value="{{ symbol|default:'' }}" placeholder="Symbol, e.g. MSFT" aria-label="Stock symbol" required>
+        <button type="submit">Show news</button>
     </form>
 
     {% if symbol %}
-    <h1 class="h4" style="margin-bottom: 1.5rem;">News for <strong>{{ symbol }}</strong></h1>
+    <header style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:.5rem; margin-bottom:1rem;">
+        <h1 style="margin:0; font-size:1.6rem;">News for {{ symbol }}</h1>
+        <a href="/live/stock/{{ symbol|urlencode }}">Analyst view &amp; chart →</a>
+    </header>
 
-    {% if news %}
-    <div class="news-grid">
-        {% for n in news %}
-        <article class="news-card">
-            <a href="{{ n.link }}" target="_blank" rel="noopener">
-                <h3>{{ n.title|default:"(no title)" }}</h3>
-                {% if n.summary %}
-                <p class="news-summary">{{ n.summary }}</p>
-                {% endif %}
-                <span class="read-more">Read more →</span>
-            </a>
+    {% include "partials/news_tone.html" with tone=tone tone_title="Headline tone" %}
+
+    {% if articles %}
+    <p class="news-count">{{ articles|length }} article{{ articles|length|pluralize }} from the last {{ window_days }} days, newest first.</p>
+    <div class="news-filters">
+        <select id="source-filter" aria-label="Filter by source">
+            <option value="">All sources ({{ sources|length }})</option>
+            {% for s in sources %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select>
+        <div class="tone-filter" role="group" aria-label="Filter by tone">
+            <button type="button" class="active" data-tone="">All</button>
+            <button type="button" data-tone="bullish">Bullish</button>
+            <button type="button" data-tone="neutral">Neutral</button>
+            <button type="button" data-tone="bearish">Bearish</button>
+        </div>
+    </div>
+
+    <div class="news-grid" id="news-grid">
+        {% for a in articles %}
+        <article class="news-card" data-source="{{ a.source }}" data-tone="{{ a.sentiment.label|default:'' }}">
+            <div class="meta">
+                <span><span class="source">{{ a.source }}</span> · <time datetime="{{ a.published_at }}">{{ a.published_at|slice:":10" }}</time></span>
+                {% if a.sentiment %}<span class="tone-chip bg-{{ a.sentiment.label }} {{ a.sentiment.label }}">{{ a.sentiment.label }}</span>{% endif %}
+            </div>
+            <h3><a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.headline }}</a></h3>
+            {% if a.summary %}<p class="news-summary">{{ a.summary }}</p>{% endif %}
+            {% if a.tickers %}
+            <div class="ticker-chips">
+                {% for t in a.tickers|slice:":6" %}<a href="?symbol={{ t|urlencode }}">{{ t }}</a>{% endfor %}
+            </div>
+            {% endif %}
         </article>
         {% endfor %}
     </div>
+    <p id="news-no-match" class="news-empty" hidden>No articles match these filters.</p>
     {% else %}
-    <article class="empty-state-card">
-        <p>📰 No news found for <strong>{{ symbol }}</strong>. Try another symbol.</p>
-    </article>
+    <article class="news-empty">📰 No news in the last {{ window_days }} days for <strong>{{ symbol }}</strong>. Try another symbol.</article>
     {% endif %}
-    {% else %}
-    <article class="empty-state-card">
-        <p>Please enter a stock symbol above to find news.</p>
-    </article>
     {% endif %}
-
 </section>
 {% endblock %}
 
 {% block extra_js %}
-<style>
-    /* News Grid (Copied from home page) */
-    .news-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 1.5rem;
-    }
+{% include "partials/news_styles.html" %}
+<script>
+(function () {
+    // "3h ago" for recent articles; the server-rendered date stays as the fallback.
+    const rtf = new Intl.RelativeTimeFormat('en', {numeric: 'auto'});
+    document.querySelectorAll('.news-card time').forEach(t => {
+        const mins = Math.round((Date.parse(t.dateTime) - Date.now()) / 60000);
+        if (!Number.isFinite(mins)) return;
+        t.title = new Date(t.dateTime).toLocaleString();
+        t.textContent = Math.abs(mins) < 60 ? rtf.format(mins, 'minute')
+            : Math.abs(mins) < 1440 ? rtf.format(Math.round(mins / 60), 'hour') : rtf.format(Math.round(mins / 1440), 'day');
+    });
 
-    .news-card {
-        background: var(--pico-card-background-color);
-        border-radius: var(--pico-border-radius);
-        padding: 1.5rem;
-        border: 1px solid var(--pico-card-border-color);
-        transition: all 0.3s ease;
+    const cards = [...document.querySelectorAll('#news-grid .news-card')];
+    const source = document.getElementById('source-filter');
+    const toneButtons = [...document.querySelectorAll('.tone-filter button')];
+    const noMatch = document.getElementById('news-no-match');
+    let tone = '';
+    function apply() {
+        let shown = 0;
+        cards.forEach(c => {
+            const ok = (!source.value || c.dataset.source === source.value) && (!tone || c.dataset.tone === tone);
+            c.hidden = !ok;
+            if (ok) shown++;
+        });
+        if (noMatch) noMatch.hidden = shown > 0;
     }
-
-    .news-card:hover {
-        transform: translateY(-4px);
-        box-shadow: var(--pico-box-shadow);
-    }
-
-    .news-card a {
-        text-decoration: none;
-        color: inherit;
-        display: block;
-    }
-
-    .news-card h3 {
-        font-size: 1.1rem;
-        margin: 0 0 0.75rem 0;
-        line-height: 1.4;
-    }
-
-    .news-summary {
-        color: var(--pico-muted-color);
-        font-size: 0.9rem;
-        line-height: 1.6;
-        margin: 0 0 1rem 0;
-    }
-
-    .read-more {
-        color: var(--pico-primary);
-        font-weight: 600;
-        font-size: 0.9rem;
-    }
-
-    /* Empty State (Copied from home page) */
-    .empty-state-card {
-        background: var(--pico-card-background-color);
-        border-radius: var(--pico-border-radius);
-        padding: 3rem;
-        text-align: center;
-        font-size: 1.1rem;
-        color: var(--pico-muted-color);
-    }
-
-    /* Responsive (Copied from home page) */
-    @media (max-width: 768px) {
-        .news-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-</style>
+    if (source) source.addEventListener('change', apply);
+    toneButtons.forEach(b => b.addEventListener('click', () => {
+        tone = b.dataset.tone;
+        toneButtons.forEach(x => x.classList.toggle('active', x === b));
+        apply();
+    }));
+})();
+</script>
 {% endblock %}
-

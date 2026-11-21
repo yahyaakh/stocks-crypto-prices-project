@@ -1,0 +1,33 @@
+{% load market_format %}
+{# Expects `tone` (from market.news.tone_summary) and optional `tone_title`. #}
+{% if tone and tone.total %}
+<article class="tone-panel">
+    <header>
+        <h2>{{ tone_title|default:"News tone" }} · last {{ tone.days }} days</h2>
+        <span class="tone-net {{ tone.net|direction }}">
+            {% if tone.net is None %}No opinionated headlines{% else %}Net {{ tone.net|floatformat:2 }} ({% if tone.net > 0 %}leaning bullish{% elif tone.net < 0 %}leaning bearish{% else %}balanced{% endif %}){% endif %}
+        </span>
+    </header>
+    <div class="tone-bar" role="img"
+         aria-label="{{ tone.bullish }} bullish, {{ tone.neutral }} neutral, {{ tone.bearish }} bearish headlines">
+        <span class="bg-bullish" style="width: {% widthratio tone.bullish tone.total 100 %}%"></span>
+        <span class="bg-neutral" style="width: {% widthratio tone.neutral tone.total 100 %}%"></span>
+        <span class="bg-bearish" style="width: {% widthratio tone.bearish tone.total 100 %}%"></span>
+    </div>
+    <div class="tone-legend">
+        <span><span class="tone-dot bg-bullish"></span>Bullish {{ tone.bullish }}</span>
+        <span><span class="tone-dot bg-neutral"></span>Neutral {{ tone.neutral }}</span>
+        <span><span class="tone-dot bg-bearish"></span>Bearish {{ tone.bearish }}</span>
+        <span>of {{ tone.total }} headlines</span>
+    </div>
+    {% if tone.model_card %}
+    <details>
+        <summary>How is this scored? ({{ tone.model_card.name }})</summary>
+        <p>{{ tone.model_card.how }} Net = (bullish − bearish) ÷ (bullish + bearish).</p>
+        <p><strong>Measured:</strong> {{ tone.model_card.measured }}</p>
+        <p><strong>Limits:</strong> {{ tone.model_card.caveat }}</p>
+        <p>This is the tone of headlines, not a forecast or investment advice.</p>
+    </details>
+    {% endif %}
+</article>
+{% endif %}

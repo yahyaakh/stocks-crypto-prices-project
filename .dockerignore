@@ -1,0 +1,14 @@
+# Keep the build context small and secret-free.
+.git
+.env
+.venv
+myenv
+venv
+**/__pycache__
+**/node_modules
+ReactFolder
+engine/build*
+data
+.idea
+.github
+*.iml

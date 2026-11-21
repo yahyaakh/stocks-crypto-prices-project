@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load humanize market_format %}
 
-{% block title %}{{ info.displayName|default:info.longName|default:symbol }} — Overview{% endblock %}
+{% block title %}{{ info.displayName|default:info.longName|default:symbol }} — Overview - Market Watch{% endblock %}
 
 {% block content %}
 <div class="stock-info-page">
@@ -53,14 +53,16 @@
             <div class="current-price">
                 <div class="price-label">Current Price</div>
                 <div class="price-value">
-                    ${{ info.currentPrice|default:info.regularMarketPrice|floatformat:2 }}
+                    {{ info.currentPrice|default:info.regularMarketPrice|money }}
                     <span class="currency">{{ info.currency|default:"USD" }}</span>
                 </div>
-                <div class="price-change {% if info.regularMarketChange >= 0 %}positive{% else %}negative{% endif %}">
-                    {% if info.regularMarketChange >= 0 %}▲{% else %}▼{% endif %}
-                    ${{ info.regularMarketChange|floatformat:2 }}
-                    ({{ info.regularMarketChangePercent|floatformat:2 }}%)
+                {% with dir=info.regularMarketChange|direction %}
+                <div class="price-change {{ dir }}">
+                    {% if dir == "positive" %}▲{% elif dir == "negative" %}▼{% endif %}
+                    {{ info.regularMarketChange|signed_money }}
+                    ({{ info.regularMarketChangePercent|signed_pct }})
                 </div>
+                {% endwith %}
             </div>
         </div>
 
@@ -68,13 +70,13 @@
             <div class="stat-item">
                 <div class="stat-label">Day Range</div>
                 <div class="stat-value">
-                    ${{ info.regularMarketDayLow|floatformat:2 }} – ${{ info.regularMarketDayHigh|floatformat:2 }}
+                    {{ info.regularMarketDayLow|money }} – {{ info.regularMarketDayHigh|money }}
                 </div>
             </div>
             <div class="stat-item">
                 <div class="stat-label">52 Week Range</div>
                 <div class="stat-value">
-                    ${{ info.fiftyTwoWeekLow|floatformat:2 }} – ${{ info.fiftyTwoWeekHigh|floatformat:2 }}
+                    {{ info.fiftyTwoWeekLow|money }} – {{ info.fiftyTwoWeekHigh|money }}
                 </div>
             </div>
             <div class="stat-item">
@@ -97,11 +99,7 @@
                 <div class="metric-content">
                     <div class="metric-label">Market Cap</div>
                     <div class="metric-value">
-                        {% if info.marketCap %}
-                        ${{ info.marketCap|floatformat:0|intcomma }}
-                        {% else %}
-                        —
-                        {% endif %}
+                        {{ info.marketCap|compact_money }}
                     </div>
                 </div>
             </div>
@@ -131,7 +129,8 @@
                 <div class="metric-content">
                     <div class="metric-label">Dividend Yield</div>
                     <div class="metric-value">
-                        {% if info.dividendYield %}{{ info.dividendYield|floatformat:4|slice:"1:" }}%{% else %}—{% endif %}
+                        {# yfinance >= 1.0 returns dividendYield already in percent (0.32 = 0.32%) #}
+                        {% if info.dividendYield %}{{ info.dividendYield|floatformat:2 }}%{% else %}—{% endif %}
                     </div>
                 </div>
             </div>
@@ -151,7 +150,7 @@
                 <div class="metric-content">
                     <div class="metric-label">EPS (TTM)</div>
                     <div class="metric-value">
-                        {% if info.trailingEps %}${{ info.trailingEps|floatformat:2 }}{% else %}—{% endif %}
+                        {{ info.trailingEps|money }}
                     </div>
                 </div>
             </div>
@@ -623,35 +622,6 @@
 </style>
 
 
-<script>
-    // Format large numbers for better readability
-    document.addEventListener('DOMContentLoaded', function() {
-        const marketCapElements = document.querySelectorAll('.metric-value');
-
-        marketCapElements.forEach(function(element) {
-            const text = element.textContent.trim();
-
-            // Check if it's a market cap (starts with $ and has many digits)
-            if (text.startsWith('$') && text.replace(/[^0-9]/g, '').length > 9) {
-                const value = parseFloat(text.replace(/[$,]/g, ''));
-
-                if (!isNaN(value)) {
-                    let formatted;
-                    if (value >= 1e12) {
-                        formatted = '$' + (value / 1e12).toFixed(2) + 'T';
-                    } else if (value >= 1e9) {
-                        formatted = '$' + (value / 1e9).toFixed(2) + 'B';
-                    } else if (value >= 1e6) {
-                        formatted = '$' + (value / 1e6).toFixed(2) + 'M';
-                    } else {
-                        formatted = '$' + value.toLocaleString();
-                    }
-                    element.textContent = formatted;
-                }
-            }
-        });
-    });
-</script>
 
 
 {% endblock %}

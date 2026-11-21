@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - Market Mini{% endblock %}
+{% block title %}Dashboard - Market Watch{% endblock %}
 
 {% block content %}
 <!-- Loading Indicator -->
@@ -46,11 +46,11 @@
                 <tr>
                     <th>Name</th>
                     <th class="num">Value</th>
-                    <th class="num">Price Change</th>
-                    <th class="num">24H % Change</th>
+                    <th class="num">Day Change</th>
+                    <th class="num">Day %</th>
                     <th class="num">1 Month</th>
                     <th class="num">1 Year</th>
-                    <th>Time (EDT)</th>
+                    <th>As of</th>
                 </tr>
                 </thead>
                 <tbody id="tbody-americas">
@@ -71,11 +71,11 @@
                 <tr>
                     <th>Name</th>
                     <th class="num">Value</th>
-                    <th class="num">Price Change</th>
-                    <th class="num">24H % Change</th>
+                    <th class="num">Day Change</th>
+                    <th class="num">Day %</th>
                     <th class="num">1 Month</th>
                     <th class="num">1 Year</th>
-                    <th>Time (EDT)</th>
+                    <th>As of</th>
                 </tr>
                 </thead>
                 <tbody id="tbody-emea">
@@ -96,11 +96,11 @@
                 <tr>
                     <th>Name</th>
                     <th class="num">Value</th>
-                    <th class="num">Price Change</th>
-                    <th class="num">24H % Change</th>
+                    <th class="num">Day Change</th>
+                    <th class="num">Day %</th>
                     <th class="num">1 Month</th>
                     <th class="num">1 Year</th>
-                    <th>Time (EDT)</th>
+                    <th>As of</th>
                 </tr>
                 </thead>
                 <tbody id="tbody-apac">
@@ -152,6 +152,7 @@
 {% endblock %}
 
 {% block extra_js %}
+{% include "partials/news_styles.html" %}
 <style>
     /* Loading Overlay */
     .loading-overlay {
@@ -327,6 +328,12 @@
     }
 
     .name-cell {
+        min-width: 10rem;
+        max-width: 18rem;
+        overflow-wrap: anywhere;   /* long token names wrap instead of widening the table */
+    }
+
+    .num {
         white-space: nowrap;
     }
 
@@ -366,6 +373,10 @@
         font-size: 0.7rem;
     }
 
+    .change-val.flat, .change-val.missing {
+        color: var(--pico-muted-color);
+    }
+
     /* Crypto Specifics */
     .icon-cell img {
         border-radius: 50%;
@@ -383,50 +394,6 @@
         font-weight: 600;
     }
 
-    /* News Grid */
-    .news-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 1.5rem;
-    }
-
-    .news-card {
-        background: var(--pico-card-background-color);
-        border-radius: var(--pico-border-radius);
-        padding: 1.5rem;
-        border: 1px solid var(--pico-card-border-color);
-        transition: all 0.3s ease;
-    }
-
-    .news-card:hover {
-        transform: translateY(-4px);
-        box-shadow: var(--pico-box-shadow);
-    }
-
-    .news-card a {
-        text-decoration: none;
-        color: inherit;
-        display: block;
-    }
-
-    .news-card h3 {
-        font-size: 1.1rem;
-        margin: 0 0 0.75rem 0;
-        line-height: 1.4;
-    }
-
-    .news-summary {
-        color: var(--pico-muted-color);
-        font-size: 0.9rem;
-        line-height: 1.6;
-        margin: 0 0 1rem 0;
-    }
-
-    .read-more {
-        color: var(--pico-primary);
-        font-weight: 600;
-        font-size: 0.9rem;
-    }
 
     /* Empty States */
     .empty-state {
@@ -478,10 +445,6 @@
         .tab-btn {
             flex: 1;
             justify-content: center;
-        }
-
-        .news-grid {
-            grid-template-columns: 1fr;
         }
     }
 </style>
@@ -535,6 +498,45 @@
     }
     }
 
+        // ── Formatting / escaping helpers ───────────────────────────────────
+        // Everything from the APIs is treated as untrusted text: escape before putting it in HTML.
+        function esc(v) {
+            return String(v ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+        }
+        function safeUrl(u) {
+            try { const x = new URL(u, location.href); return (x.protocol === 'https:' || x.protocol === 'http:') ? x.href : '#'; }
+            catch { return '#'; }
+        }
+        const isNum = v => typeof v === 'number' && Number.isFinite(v);
+        // Round first, then decide the sign, so -0.004 shows as 0.00 (flat), not -0.00.
+        function dir(v) {
+            if (!isNum(v)) return 'missing';
+            const r = Math.round(v * 100) / 100;
+            return r > 0 ? 'positive' : r < 0 ? 'negative' : 'flat';
+        }
+        function num(v, d = 2) {
+            return isNum(v) ? v.toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d}) : '—';
+        }
+        function signed(v, d = 2) {
+            if (!isNum(v)) return '—';
+            const s = dir(v);
+            return (s === 'positive' ? '+' : s === 'negative' ? '-' : '') + num(Math.abs(v), d);
+        }
+        const signedPct = v => isNum(v) ? signed(v) + '%' : '—';
+        // Crypto prices range from $100k to fractions of a cent: keep ~4 significant digits for small ones.
+        function price(v) {
+            if (!isNum(v)) return '—';
+            const d = v >= 1 ? 2 : v >= 0.01 ? 4 : 8;
+            return '$' + num(v, d);
+        }
+        function compactMoney(v) {
+            if (!isNum(v)) return '—';
+            for (const [div, suf] of [[1e12, 'T'], [1e9, 'B'], [1e6, 'M']]) {
+                if (Math.abs(v) >= div) return '$' + num(v / div) + suf;
+            }
+            return '$' + num(v, 0);
+        }
+
         // ── World indices (loads immediately on page open) ──────────────────
         async function loadStocksData() {
         try {
@@ -542,21 +544,19 @@
         if (!response.ok) throw new Error('Failed to fetch indices');
         const data = await response.json();
 
-        function changeClass(v) { return v >= 0 ? 'positive' : 'negative'; }
-
         function buildRows(rows) {
         if (!rows || rows.length === 0)
         return '<tr><td colspan="7" class="empty-state">No data available</td></tr>';
 
         return rows.map(r => `
                         <tr>
-                            <td class="name-cell"><strong>${r.name}</strong></td>
-                            <td class="num">${r.value ?? '—'}</td>
-                            <td class="num change-val ${changeClass(r.change)}">${r.change ?? '—'}</td>
-                            <td class="num change-val ${changeClass(r.pct_change)}">${r.pct_change ?? '—'}%</td>
-                            <td class="num change-val ${changeClass(r.m1)}">${r.m1 ?? '—'}%</td>
-                            <td class="num change-val ${changeClass(r.y1)}">${r.y1 ?? '—'}%</td>
-                            <td class="time-cell">${r.time_edt}</td>
+                            <td class="name-cell"><strong>${esc(r.name)}</strong></td>
+                            <td class="num">${num(r.value)}</td>
+                            <td class="num change-val ${dir(r.change)}">${signed(r.change)}</td>
+                            <td class="num change-val ${dir(r.pct_change)}">${signedPct(r.pct_change)}</td>
+                            <td class="num change-val ${dir(r.m1)}">${signedPct(r.m1)}</td>
+                            <td class="num change-val ${dir(r.y1)}">${signedPct(r.y1)}</td>
+                            <td class="time-cell">${esc(r.as_of ?? '—')}</td>
                         </tr>`
         ).join('');
     }
@@ -588,23 +588,23 @@
         if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No crypto data available</td></tr>';
     } else {
-        data.forEach(row => {
-        const changeClass = row.price_change_percentage_24h >= 0 ? 'positive' : 'negative';
-        tbody.innerHTML += `
+        tbody.innerHTML = data.map(row => {
+        const pct = row.price_change_percentage_24h;
+        return `
                             <tr>
-                                <td class="symbol-cell">${row.symbol.toUpperCase()}</td>
-                                <td class="name-cell"><strong>${row.name}</strong></td>
+                                <td class="symbol-cell">${esc(String(row.symbol ?? '').toUpperCase())}</td>
+                                <td class="name-cell"><strong>${esc(row.name)}</strong></td>
                                 <td class="icon-cell">
-                                    <img src="${row.image}" alt="${row.name} logo"
+                                    <img src="${esc(safeUrl(row.image))}" alt="${esc(row.name)} logo"
                                          width="28" height="28" loading="lazy"
                                          onerror="this.style.display='none'">
                                 </td>
-                                <td class="num">$${row.current_price}</td>
-                                <td class="num">$${row.market_cap || '—'}</td>
-                                <td class="num"><span class="rank-badge">${row.market_cap_rank}</span></td>
-                                <td class="num change-val ${changeClass}">${row.price_change_percentage_24h}%</td>
+                                <td class="num">${price(row.current_price)}</td>
+                                <td class="num">${compactMoney(row.market_cap)}</td>
+                                <td class="num"><span class="rank-badge">${esc(row.market_cap_rank ?? '—')}</span></td>
+                                <td class="num change-val ${dir(pct)}">${signedPct(pct)}</td>
                             </tr>`;
-    });
+    }).join('');
     }
 
         document.querySelector('#panel-crypto .lazy-load-placeholder').classList.add('hidden');
@@ -618,43 +618,118 @@
     }
 
         // ── News ─────────────────────────────────────────────────────────────
+        // Same layout as the per-stock page (templates/stock_news.html + partials/news_tone.html).
+        const rtf = new Intl.RelativeTimeFormat('en', {numeric: 'auto'});
+        function ago(iso) {
+            const mins = Math.round((Date.parse(iso) - Date.now()) / 60000);
+            if (!Number.isFinite(mins)) return '';
+            return Math.abs(mins) < 60 ? rtf.format(mins, 'minute')
+                : Math.abs(mins) < 1440 ? rtf.format(Math.round(mins / 60), 'hour') : rtf.format(Math.round(mins / 1440), 'day');
+        }
+        const pct = (n, total) => total ? (100 * n / total).toFixed(1) : 0;
+
+        function tonePanel(t) {
+            if (!t || !t.total) return '';
+            const lean = t.net === null ? 'No opinionated headlines'
+                : `Net ${t.net.toFixed(2)} (${t.net > 0 ? 'leaning bullish' : t.net < 0 ? 'leaning bearish' : 'balanced'})`;
+            const card = t.model_card ? `
+                <details>
+                    <summary>How is this scored? (${esc(t.model_card.name)})</summary>
+                    <p>${esc(t.model_card.how)} Net = (bullish − bearish) ÷ (bullish + bearish).</p>
+                    <p><strong>Measured:</strong> ${esc(t.model_card.measured)}</p>
+                    <p><strong>Limits:</strong> ${esc(t.model_card.caveat)}</p>
+                    <p>This is the tone of headlines, not a forecast or investment advice.</p>
+                </details>` : '';
+            return `
+                <article class="tone-panel">
+                    <header>
+                        <h2>Market headline tone · last ${t.days} days</h2>
+                        <span class="tone-net ${dir(t.net)}">${lean}</span>
+                    </header>
+                    <div class="tone-bar" role="img" aria-label="${t.bullish} bullish, ${t.neutral} neutral, ${t.bearish} bearish headlines">
+                        <span class="bg-bullish" style="width:${pct(t.bullish, t.total)}%"></span>
+                        <span class="bg-neutral" style="width:${pct(t.neutral, t.total)}%"></span>
+                        <span class="bg-bearish" style="width:${pct(t.bearish, t.total)}%"></span>
+                    </div>
+                    <div class="tone-legend">
+                        <span><span class="tone-dot bg-bullish"></span>Bullish ${t.bullish}</span>
+                        <span><span class="tone-dot bg-neutral"></span>Neutral ${t.neutral}</span>
+                        <span><span class="tone-dot bg-bearish"></span>Bearish ${t.bearish}</span>
+                        <span>of ${t.total} headlines</span>
+                    </div>${card}
+                </article>`;
+        }
+
+        function newsCard(a) {
+            const s = a.sentiment;
+            const tickers = (a.tickers || []).slice(0, 6)
+                .map(t => `<a href="/stocknews/?symbol=${encodeURIComponent(t)}">${esc(t)}</a>`).join('');
+            return `
+                <article class="news-card" data-source="${esc(a.source)}" data-tone="${s ? esc(s.label) : ''}">
+                    <div class="meta">
+                        <span><span class="source">${esc(a.source)}</span> · <time datetime="${esc(a.published_at)}" title="${esc(new Date(a.published_at).toLocaleString())}">${esc(ago(a.published_at))}</time></span>
+                        ${s ? `<span class="tone-chip bg-${esc(s.label)} ${esc(s.label)}">${esc(s.label)}</span>` : ''}
+                    </div>
+                    <h3><a href="${esc(safeUrl(a.url))}" target="_blank" rel="noopener noreferrer">${esc(a.headline)}</a></h3>
+                    ${a.summary ? `<p class="news-summary">${esc(a.summary)}</p>` : ''}
+                    ${tickers ? `<div class="ticker-chips">${tickers}</div>` : ''}
+                </article>`;
+        }
+
         async function loadNewsData() {
+        const placeholder = document.querySelector('#panel-top-stocks .lazy-load-placeholder');
         try {
-        const response = await fetch('/api/news/');
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const response = await fetch('/api/news/');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            const articles = data.articles || [];
+            const newsContent = document.getElementById('news-content');
 
-        const data = await response.json();
-        const newsContent = document.getElementById('news-content');
+            if (articles.length === 0) {
+                newsContent.innerHTML = '<article class="news-empty">📰 No news available at the moment</article>';
+            } else {
+                const sources = data.sources || [];
+                newsContent.innerHTML = `
+                    ${tonePanel(data.tone)}
+                    <div class="news-filters">
+                        <select id="news-source-filter" aria-label="Filter by source">
+                            <option value="">All sources (${sources.length})</option>
+                            ${sources.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('')}
+                        </select>
+                        <div class="tone-filter" role="group" aria-label="Filter by tone">
+                            ${['', 'bullish', 'neutral', 'bearish'].map(t =>
+                                `<button type="button" data-tone="${t}" class="${t ? '' : 'active'}">${t ? t[0].toUpperCase() + t.slice(1) : 'All'}</button>`).join('')}
+                        </div>
+                    </div>
+                    <div class="news-grid">${articles.map(newsCard).join('')}</div>
+                    <p id="news-no-match" class="news-empty" hidden>No articles match these filters.</p>`;
 
-        if (data.length === 0) {
-        newsContent.innerHTML = `
-                        <article class="empty-state-card">
-                            <p>📰 No news available at the moment</p>
-                        </article>`;
-    } else {
-        let html = '<div class="news-grid">';
-        data.forEach(n => {
-        html += `
-                            <article class="news-card">
-                                <a href="${n.link}" target="_blank" rel="noopener">
-                                    <h3>${n.title || '(no title)'}</h3>
-                                    ${n.summary ? `<p class="news-summary">${n.summary}</p>` : ''}
-                                    <span class="read-more">Read more →</span>
-                                </a>
-                            </article>`;
-    });
-        html += '</div>';
-        newsContent.innerHTML = html;
-    }
-
-        document.querySelector('#panel-top-stocks .lazy-load-placeholder').classList.add('hidden');
-        newsContent.classList.remove('hidden');
-
-    } catch (error) {
-        console.error('Error loading news data:', error);
-        document.querySelector('#panel-top-stocks .lazy-load-placeholder').innerHTML =
-        '<p style="color: var(--pico-color);">❌ Failed to load news. Please try again later.</p>';
-    }
+                const cards = [...newsContent.querySelectorAll('.news-card')];
+                const sourceSel = document.getElementById('news-source-filter');
+                const toneBtns = [...newsContent.querySelectorAll('.tone-filter button')];
+                let tone = '';
+                const apply = () => {
+                    let shown = 0;
+                    cards.forEach(c => {
+                        const ok = (!sourceSel.value || c.dataset.source === sourceSel.value) && (!tone || c.dataset.tone === tone);
+                        c.hidden = !ok;
+                        if (ok) shown++;
+                    });
+                    document.getElementById('news-no-match').hidden = shown > 0;
+                };
+                sourceSel.addEventListener('change', apply);
+                toneBtns.forEach(b => b.addEventListener('click', () => {
+                    tone = b.dataset.tone;
+                    toneBtns.forEach(x => x.classList.toggle('active', x === b));
+                    apply();
+                }));
+            }
+            placeholder.classList.add('hidden');
+            newsContent.classList.remove('hidden');
+        } catch (error) {
+            console.error('Error loading news data:', error);
+            placeholder.innerHTML = '<p style="color: var(--pico-color);">❌ Failed to load news. Please try again later.</p>';
+        }
     }
 
         // ── Boot ─────────────────────────────────────────────────────────────

@@ -4,8 +4,14 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Market Mini{% endblock %}</title>
+    <title>{% block title %}Market Watch{% endblock %}</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231095c1'/%3E%3Cpolyline points='5,22 12,15 17,19 27,8' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        /* Pico joins a search input and its button into one pill; keep the button on one line
+           so it doesn't grow taller than the input. */
+        form[role="search"] button { white-space: nowrap; width: auto; padding-inline: 1.25rem; }
+    </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body>

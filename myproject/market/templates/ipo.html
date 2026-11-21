@@ -1,17 +1,17 @@
 {% extends "base.html" %}
-{% load humanize %}
-{% block title %}IPO Calendar - Market Mini{% endblock %}
+{% load humanize market_format %}
+{% block title %}IPO Calendar - Market Watch{% endblock %}
 
 {% block content %}
 <div class="ipo-page">
     <!-- Header -->
     <div class="ipo-header">
         <h1>📅 IPO Calendar</h1>
-        <p class="subtitle">Upcoming Initial Public Offerings</p>
+        <p class="subtitle">Upcoming and recent Initial Public Offerings</p>
         <div class="date-range">
             <span class="date-badge">
                 <span class="badge-icon">📆</span>
-                Today - Next 12 Months
+                Last 30 days &amp; next 12 months
             </span>
         </div>
     </div>
@@ -23,11 +23,13 @@
         <div class="table-controls">
             <input type="search" id="ipo-search" placeholder="Search by company, symbol, or exchange..." class="search-input">
             <select id="exchange-filter" class="filter-select">
-                <option value="">All Exchanges</option>
-                <option value="NYSE">NYSE</option>
-                <option value="NASDAQ">NASDAQ</option>
-                <option value="NASDAQ Capital">NASDAQ Capital</option>
-                <option value="NASDAQ Global">NASDAQ Global</option>
+                <option value="">All exchanges</option>
+                <!-- options are filled from the rows below by the script -->
+            </select>
+            <select id="when-filter" class="filter-select">
+                <option value="">Upcoming &amp; recent</option>
+                <option value="upcoming">Upcoming only</option>
+                <option value="recent">Recent only</option>
             </select>
         </div>
 
@@ -39,60 +41,41 @@
                     <th scope="col">Company</th>
                     <th scope="col">Symbol</th>
                     <th scope="col">Exchange</th>
+                    <th scope="col">Status</th>
                     <th scope="col" class="num">Shares</th>
-                    <th scope="col" class="num">Price Range</th>
-                    <th scope="col" class="num">Expected Value</th>
+                    <th scope="col" class="num">Price</th>
+                    <th scope="col" class="num">Offer Value</th>
                 </tr>
                 </thead>
                 <tbody>
                 {% for row in ipo %}
-                <tr class="ipo-row" data-exchange="{{ row.exchange }}">
-                    <td class="date-cell">
-                        <div class="date-display">
-                            <span class="date">{{ row.date }}</span>
-                        </div>
-                    </td>
-                    <td class="company-cell">
-                        <strong>{{ row.name }}</strong>
-                    </td>
-                    <td class="symbol-cell">
-                        <span class="symbol-badge">{{ row.symbol }}</span>
-                    </td>
-                    <td class="exchange-cell">
-                        <span class="exchange-tag">{{ row.exchange }}</span>
-                    </td>
+                <tr class="ipo-row" data-exchange="{{ row.exchange|default:'' }}" data-when="{% if row.upcoming %}upcoming{% else %}recent{% endif %}">
+                    <td class="date-cell">{{ row.date|default:"TBA" }}</td>
+                    <td class="company-cell"><strong>{{ row.name|default:"—" }}</strong></td>
+                    <td class="symbol-cell">{% if row.symbol %}<span class="symbol-badge">{{ row.symbol }}</span>{% else %}<span class="na-text">TBA</span>{% endif %}</td>
+                    <td class="exchange-cell">{% if row.exchange %}<span class="exchange-tag">{{ row.exchange }}</span>{% else %}<span class="na-text">—</span>{% endif %}</td>
+                    <td class="status-cell"><span class="status-pill status-{{ row.status|default:'unknown' }}">{{ row.status|default:"unknown"|capfirst }}</span></td>
                     <td class="num shares-cell">
-                        {% if row.numberOfShares %}
-                        {{ row.numberOfShares|intcomma }}
-                        {% else %}
-                        <span class="na-text">TBA</span>
-                        {% endif %}
+                        {% if row.numberOfShares %}{{ row.numberOfShares|intcomma }}{% else %}<span class="na-text">TBA</span>{% endif %}
                     </td>
                     <td class="num price-cell">
-                        {% if row.price %}
-                        <span class="price-range">${{ row.price }}</span>
-                        {% else %}
-                        <span class="na-text">TBA</span>
-                        {% endif %}
+                        {% if row.price %}<span class="price-range">${{ row.price }}</span>{% else %}<span class="na-text">TBA</span>{% endif %}
                     </td>
                     <td class="num value-cell">
-                        {% if row.totalSharesValue %}
-                        <span class="value-amount">${{ row.totalSharesValue|intcomma }}</span>
-                        {% else %}
-                        <span class="na-text">TBA</span>
-                        {% endif %}
+                        {% if row.totalSharesValue %}<span class="value-amount">{{ row.totalSharesValue|compact_money }}</span>{% else %}<span class="na-text">TBA</span>{% endif %}
                     </td>
                 </tr>
                 {% endfor %}
                 </tbody>
             </table>
+            <p id="ipo-no-results" class="na-text" hidden>No IPOs match your filters.</p>
         </div>
         {% else %}
         <div class="empty-state">
             <div class="empty-icon">📭</div>
-            <h2>No Upcoming IPOs</h2>
-            <p>There are no scheduled IPOs in the next 12 months.</p>
-            <p class="empty-hint">Check back later for updates!</p>
+            <h2>No IPOs found</h2>
+            <p>The IPO calendar returned nothing for the last 30 days or the next 12 months.</p>
+            <p class="empty-hint">This also happens when the Finnhub API key is missing or the API is unavailable.</p>
         </div>
         {% endif %}
     </section>
@@ -100,11 +83,11 @@
     <!-- Info Card -->
     <aside class="info-card">
         <h3>💡 About IPO Calendar</h3>
-        <p>This calendar shows companies planning to go public in the next 12 months. IPO information includes:</p>
+        <p>Data comes from Finnhub's IPO calendar. Upcoming IPOs are listed first (soonest first), then recent ones (newest first).</p>
         <ul>
-            <li><strong>Date:</strong> Expected listing date</li>
-            <li><strong>Price Range:</strong> Expected initial share price</li>
-            <li><strong>Expected Value:</strong> Total value of shares being offered</li>
+            <li><strong>Status:</strong> expected, priced, filed or withdrawn, as reported by Finnhub</li>
+            <li><strong>Price:</strong> the offer price, or the expected range before pricing</li>
+            <li><strong>Offer Value:</strong> total value of the shares being offered</li>
         </ul>
         <p class="info-note">⚠️ <em>Note: Dates and prices are subject to change. Always verify with official sources.</em></p>
     </aside>
@@ -390,87 +373,51 @@
             font-size: 1.2rem;
         }
     }
+    .table-controls { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+    .table-controls > * { margin: 0; }
+    .date-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .status-pill { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.8rem; font-weight: 600;
+                   background: var(--pico-form-element-background-color); border: 1px solid var(--pico-card-border-color); }
+    .status-priced { background: rgba(76, 175, 80, 0.12); color: #2d7d46; border-color: transparent; }
+    .status-expected { background: rgba(16, 149, 193, 0.12); color: #0d7fa3; border-color: transparent; }
+    .status-withdrawn { background: rgba(239, 83, 80, 0.12); color: #c62828; border-color: transparent; }
+    #ipo-no-results { padding: 1rem; text-align: center; margin: 0; }
+    @media (max-width: 768px) { .table-controls { grid-template-columns: 1fr; } }
 </style>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Search functionality
+    document.addEventListener('DOMContentLoaded', function () {
         const searchInput = document.getElementById('ipo-search');
         const exchangeFilter = document.getElementById('exchange-filter');
+        const whenFilter = document.getElementById('when-filter');
+        const noResults = document.getElementById('ipo-no-results');
         const rows = document.querySelectorAll('.ipo-row');
 
-        function filterTable() {
-        // 1. Get user input
-            const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
-            const selectedExchange = exchangeFilter ? exchangeFilter.value : '';
-         // 2. Loop through every row currently on screen
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                const exchange = row.dataset.exchange;
-                
-         // 3. Logic: Does it match the Search AND the Dropdown?
-                const matchesSearch = text.includes(searchTerm);
-                const matchesExchange = !selectedExchange || exchange === selectedExchange;
-
-                row.style.display = (matchesSearch && matchesExchange) ? '' : 'none';
+        // Exchange options = the exchanges actually present (some rows have none).
+        if (exchangeFilter) {
+            [...new Set([...rows].map(r => r.dataset.exchange).filter(Boolean))].sort().forEach(ex => {
+                exchangeFilter.add(new Option(ex, ex));
             });
         }
 
-        if (searchInput) {
-            searchInput.addEventListener('input', filterTable);
+        function filterTable() {
+            const term = searchInput ? searchInput.value.toLowerCase() : '';
+            const ex = exchangeFilter ? exchangeFilter.value : '';
+            const when = whenFilter ? whenFilter.value : '';
+            let shown = 0;
+            rows.forEach(row => {
+                const ok = row.textContent.toLowerCase().includes(term)
+                    && (!ex || row.dataset.exchange === ex)
+                    && (!when || row.dataset.when === when);
+                row.style.display = ok ? '' : 'none';
+                if (ok) shown++;
+            });
+            if (noResults) noResults.hidden = shown > 0;
         }
 
-        if (exchangeFilter) {
-            exchangeFilter.addEventListener('change', filterTable);
-        }
-
-        // Calculate stats
-        let totalValue = 0;
-        let priceCount = 0;
-        let priceSum = 0;
-
-        document.querySelectorAll('.value-cell .value-amount').forEach(el => {
-            const value = parseFloat(el.textContent.replace(/[$,]/g, ''));
-            if (!isNaN(value)) totalValue += value;
+        [searchInput, exchangeFilter, whenFilter].forEach(el => {
+            if (el) el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', filterTable);
         });
-
-        document.querySelectorAll('.price-cell .price-range').forEach(el => {
-            const priceText = el.textContent.replace(/[$]/g, '');
-            // Handle price ranges like "15.00-17.00"
-            const prices = priceText.split('-').map(p => parseFloat(p.trim()));
-            if (prices.length > 0 && !isNaN(prices[0])) {
-                const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
-                priceSum += avgPrice;
-                priceCount++;
-            }
-        });
-
-        // Format total value
-        const totalValueEl = document.getElementById('total-value');
-        if (totalValueEl) {
-            if (totalValue > 0) {
-                if (totalValue >= 1e9) {
-                    totalValueEl.textContent = '$' + (totalValue / 1e9).toFixed(2) + 'B';
-                } else if (totalValue >= 1e6) {
-                    totalValueEl.textContent = '$' + (totalValue / 1e6).toFixed(2) + 'M';
-                } else {
-                    totalValueEl.textContent = '$' + totalValue.toLocaleString();
-                }
-            } else {
-                totalValueEl.textContent = 'TBA';
-            }
-        }
-
-        // Format average price
-        const avgPriceEl = document.getElementById('avg-price');
-        if (avgPriceEl) {
-            if (priceCount > 0) {
-                const avgPrice = priceSum / priceCount;
-                avgPriceEl.textContent = '$' + avgPrice.toFixed(2);
-            } else {
-                avgPriceEl.textContent = 'TBA';
-            }
-        }
     });
 </script>
 {% endblock %}

@@ -1,53 +1,57 @@
 import logging
+import os
+import tempfile
 import threading
 import time
 import urllib.request
 
 from django.apps import AppConfig
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
+WARMUP_PATHS = ["/api/indices/", "/api/crypto/", "/api/news/", "/mag7/", "/etfs/", "/ipo/", "/"]
+
 
 class MarketConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'market'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "market"
 
     def ready(self):
-        # Don't run during migrations or management commands
-        import sys
-        if 'runserver' not in sys.argv and 'gunicorn' not in ' '.join(sys.argv):
-            # Still warm on gunicorn (production)
-            pass
+        _isolate_yfinance_cache()
+        # Opt-in only (CACHE_WARMUP=1), so tests, collectstatic and migrate never start it.
+        # Caveat: LocMemCache is per process, so with N gunicorn workers this warms only
+        # whichever worker answers each request. A shared cache (Redis) would fix that.
+        if os.environ.get("CACHE_WARMUP") == "1":
+            threading.Thread(target=_warm_cache, daemon=True, name="cache-warmup").start()
 
-        thread = threading.Thread(target=self._warm_cache, daemon=True)
-        thread.start()
 
-    @staticmethod
-    def _warm_cache():
-        # Wait for gunicorn/Django to fully finish booting
-        time.sleep(20)
+def _isolate_yfinance_cache():
+    """yfinance keeps SQLite caches (timezones, cookies) in one shared directory. With several
+    gunicorn worker processes, concurrent requests then fail with `peewee.OperationalError:
+    database is locked`. ready() runs once per worker process, so a per-PID directory means no
+    two processes ever share a cache file."""
+    import yfinance as yf
 
-        base = "http://127.0.0.1:8000"
-        urls = [
-            "/api/indices/",   # heaviest — world indices (Yahoo Finance batch)
-            "/api/crypto/",    # CoinGecko
-            "/api/news/",      # parallel news fetch
-            "/mag7/",          # Magnificent 7
-            "/etfs/",          # ETF batch
-            "/ipo/",           # Finnhub IPO
-        ]
+    path = os.path.join(tempfile.gettempdir(), f"py-yfinance-{os.getpid()}")
+    os.makedirs(path, exist_ok=True)
+    yf.set_tz_cache_location(path)
 
-        logger.info("[WARMUP] Cache warming started...")
 
-        for url in urls:
-            try:
-                req = urllib.request.Request(
-                    base + url,
-                    headers={"User-Agent": "CacheWarmer/1.0"}
-                )
-                urllib.request.urlopen(req, timeout=120)
-                logger.info(f"[WARMUP] ✓ {url}")
-            except Exception as e:
-                logger.warning(f"[WARMUP] ✗ {url} — {e}")
+def _warm_cache():
+    base = os.environ.get("CACHE_WARMUP_URL", "http://127.0.0.1:8000")
+    delay_s = float(os.environ.get("CACHE_WARMUP_DELAY_S", "20"))
+    host = settings.ALLOWED_HOSTS[0]  # Host header must pass ALLOWED_HOSTS validation
+    time.sleep(delay_s)  # let the server finish binding before we call it
 
-        logger.info("[WARMUP] Complete — all endpoints cached!")
+    logger.info("cache warmup start base=%s", base)
+    for path in WARMUP_PATHS:
+        t0 = time.perf_counter()
+        try:
+            req = urllib.request.Request(base + path, headers={"User-Agent": "CacheWarmer/1.0", "Host": host})
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                status = resp.status
+            logger.info("cache warmup path=%s status=%s ms=%.0f", path, status, (time.perf_counter() - t0) * 1e3)
+        except Exception as exc:
+            logger.warning("cache warmup failed path=%s err=%s", path, exc)
+    logger.info("cache warmup done")

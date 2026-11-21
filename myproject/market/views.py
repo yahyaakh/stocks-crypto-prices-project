@@ -1,55 +1,50 @@
-
-from django.shortcuts import render
-
-from .providers.api_providers import get_crypto_table
-from .stocks.stock_prices import get_magnificent7_prices, get_biggest_etf_stock_prices, get_stock_information, \
-    get_target_price, get_stock_news
-
-from .providers.Nexchange import get_crypto_table
-from .stocks.stocks_home_page import get_world_indices_tables , get_general_stock_news_yf
-
-from .stocks.IPO import show_ipo
-
-from django.views.decorators.cache import cache_page
-from django.views.decorators.http import require_http_methods
-
 import logging
-
-
-from django.http import JsonResponse
-import yfinance as yf
-
-
 import math
 
+import yfinance as yf
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.views.decorators.cache import cache_control, cache_page, never_cache
+from django.views.decorators.http import require_GET
 
-# def biggest_movers_list(request):
-#     crypto_movers = biggest_crypto_movers(limit=10)
-#     return render(request, "biggest_movers.html", {"movers": movers})
+from .providers.Nexchange import get_crypto_table
+from .stocks.IPO import show_ipo
+from .stocks.stock_prices import (
+    get_biggest_etf_stock_prices,
+    get_magnificent7_prices,
+    get_stock_information,
+    get_target_price,
+)
+from .news import company_news, market_news
+from .stocks.stocks_home_page import get_world_indices_tables
+from .stocks.stocksOverview import (
+    get_analyst_ratings,
+    get_recommendation_trend,
+    get_stock_history,
+    get_stock_overview,
+)
+
+logger = logging.getLogger(__name__)
+
+# Whole-response caching (django cache_page). Market pages tolerate a few minutes of staleness;
+# analyst data changes at most daily.
+PAGE_TTL_S = 5 * 60
+ANALYST_TTL_S = 60 * 60
+# Browsers may reuse a response for at most this long. Without it cache_page would send
+# max-age=TTL, and a browser could keep an empty/failed response for a full hour.
+BROWSER_TTL_S = 60
 
 
-# @cache_page Decorator stores the entire Render page in the cache for a specific period of time
-# it improves performance :
-# for pages that d'ont change often
-# high traffic pages with static content
-# API end points with stable DATA
-
-""" @cache_page(60 * 5) means the page will be cached for 5 minutes before it needs to be regenerated."""
-# 60 = 1 minutes
-@cache_page(60 * 5)
-
-@cache_page(60 * 5)
-def home(request):
-    # Return empty shell instantly — data loads via JS
-    return render(request, "homepage.html", {
-        "americas": [],
-        "emea": [],
-        "apac": [],
-    })
+def cached(ttl_s: int):
+    """Server-side cache for `ttl_s`, browser cache for at most BROWSER_TTL_S.
+    (cache_page keeps the smaller of the two max-age values.)"""
+    def decorator(view):
+        return cache_page(ttl_s)(cache_control(max_age=BROWSER_TTL_S)(view))
+    return decorator
 
 
 def sanitize_floats(obj):
-    """Replace NaN/Infinity with None so JsonResponse doesn't break."""
+    """Replace NaN/Infinity with None: they are not valid JSON."""
     if isinstance(obj, list):
         return [sanitize_floats(i) for i in obj]
     if isinstance(obj, dict):
@@ -58,156 +53,175 @@ def sanitize_floats(obj):
         return None
     return obj
 
-@cache_page(60 * 5)
-@require_http_methods(["GET"])
-def api_world_indices(request):
-    try:
-        data = get_world_indices_tables()
-        return JsonResponse(sanitize_floats(data), safe=False)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+
+def _json_error(view: str, exc: Exception, status: int = 500) -> JsonResponse:
+    logger.exception("view failed view=%s", view)
+    return JsonResponse({"error": str(exc)}, status=status)
 
 
+@never_cache
+@require_GET
+def healthz(request):
+    """Liveness probe: the process is up and serving. Does not call upstream APIs."""
+    return JsonResponse({"status": "ok"})
 
 
-@cache_page(60 * 5)
+# ---------- HTML pages ----------
 
-@require_http_methods(["GET"]) # Security best practice. It ensures no one can try to POST or DELETE data at this URL.
-def api_crypto(request):
-    """Return crypto data as JSON"""
-    try:
-        crypto_rows = get_crypto_table()
-        print(f" Crypto API: Returning {len(crypto_rows) if crypto_rows else 0} rows")
-        return JsonResponse(crypto_rows if crypto_rows else [], safe=False)
-    except Exception as e:
-        print(f" Error in api_crypto: {e}")
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({'error': str(e)}, status=500)
+@cached(PAGE_TTL_S)
+def home(request):
+    # Empty shell; tables are filled by JS from the /api/ endpoints.
+    return render(request, "homepage.html", {"americas": [], "emea": [], "apac": []})
 
 
-@cache_page(60 * 5)
-
-@require_http_methods(["GET"])
-def api_news(request):
-    """Return news data as JSON"""
-    try:
-        news = get_general_stock_news_yf()
-        print(f"News API: Returning {len(news) if news else 0} items")
-        return JsonResponse(news if news else [], safe=False)
-    except Exception as e:
-        print(f" Error in api_news: {e}")
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({'error': str(e)}, status=500)
-
-logger = logging.getLogger(__name__)
-
-@cache_page(60 * 5)
+@cached(PAGE_TTL_S)
 def magnificent7_view(request):
-    """Display Magnificent 7 stocks"""
-    mag7 = get_magnificent7_prices()
+    return render(request, "magnificent7.html", {"mag7": get_magnificent7_prices()})
 
 
-    return render(request, 'magnificent7.html', {"mag7": mag7})
+@cached(PAGE_TTL_S)
+def etf(request):
+    return render(request, "etfs.html", {"etfs": get_biggest_etf_stock_prices()})
 
 
-@cache_page(60 * 5)
-
-def etf (request):
-    etfs  = get_biggest_etf_stock_prices()
-    return render(request, "etfs.html", {"etfs": etfs})
-
-@cache_page(60 * 5)
-
+@cached(PAGE_TTL_S)
 def stocks_page(request):
     return render(request, "stocks.html")
 
-@cache_page(60 * 5)
 
+def _symbol(request, default: str = "MSFT") -> str:
+    return (request.GET.get("symbol") or default).strip().upper()
+
+
+@cached(PAGE_TTL_S)
 def stock_detail(request):
-    symbol = (request.GET.get("symbol") or "MSFT").upper()
-    info = get_stock_information(symbol)
-    return render(request, "stock_detail.html", {"symbol": symbol, "info": info})
+    symbol = _symbol(request)
+    return render(request, "stock_detail.html", {"symbol": symbol, "info": get_stock_information(symbol)})
 
-@cache_page(60 * 5)
 
+@cached(PAGE_TTL_S)
 def price_target(request):
-    symbol = (request.GET.get("symbol") or "MSFT").upper()
-    targets = get_target_price(symbol)
-    return render(request, "price_target.html", {"symbol": symbol, "targets": targets})
+    symbol = _symbol(request)
+    return render(request, "price_target.html", {"symbol": symbol, "targets": get_target_price(symbol)})
 
-@cache_page(60 * 5)
 
+@cached(PAGE_TTL_S)
 def stock_news(request):
-    symbol = (request.GET.get("symbol") or "MSFT").upper()
-    news = get_stock_news(symbol)
-    return render(request, "stock_news.html", {"symbol": symbol, "news": news})
+    symbol = _symbol(request)
+    return render(request, "stock_news.html", {"symbol": symbol, **company_news(symbol)})
 
 
-@cache_page(60 * 5)
-
+@cached(PAGE_TTL_S)
 def stocks_ipo(request):
-    ipo = show_ipo()
-    return render(request, "ipo.html", {"ipo": ipo})
+    return render(request, "ipo.html", {"ipo": show_ipo()})
 
 
+def live_watch_view(request, rest=""):
+    """Serves the page that mounts the compiled React watchlist (static/react-watchlist.js)."""
+    return render(request, "live_watch.html")
 
 
+# ---------- JSON API ----------
+
+@cached(PAGE_TTL_S)
+@require_GET
+def api_world_indices(request):
+    try:
+        return JsonResponse(sanitize_floats(get_world_indices_tables()), safe=False)
+    except Exception as exc:
+        return _json_error("api_world_indices", exc)
+
+
+@cached(PAGE_TTL_S)
+@require_GET
+def api_crypto(request):
+    try:
+        rows = get_crypto_table()
+        logger.info("api_crypto rows=%d", len(rows))
+        return JsonResponse(sanitize_floats(rows), safe=False)
+    except Exception as exc:
+        return _json_error("api_crypto", exc)
+
+
+@cached(PAGE_TTL_S)
+@require_GET
+def api_news(request):
+    try:
+        return JsonResponse(market_news())
+    except Exception as exc:
+        return _json_error("api_news", exc)
+
+
+@cached(PAGE_TTL_S)
+@require_GET
+def api_company_news(request, symbol):
+    try:
+        return JsonResponse(company_news(symbol))
+    except Exception as exc:
+        return _json_error("api_company_news", exc)
+
+
+@cached(ANALYST_TTL_S)
+@require_GET
+def api_recommendation_trend(request, symbol):
+    try:
+        return JsonResponse(get_recommendation_trend(symbol))
+    except Exception as exc:
+        return _json_error("api_recommendation_trend", exc)
+
+
+@require_GET
 def api_get_stock_price(request):
-    symbol = request.GET.get('symbol', '').upper()
-
+    symbol = _symbol(request, default="")
     if not symbol:
-        return JsonResponse({'error': 'No symbol provided'}, status=400)
+        return JsonResponse({"error": "No symbol provided"}, status=400)
+
+    try:
+        fast = yf.Ticker(symbol).fast_info
+        price, prev_close = fast["last_price"], fast["previous_close"]
+    except Exception:
+        # yfinance raises (KeyError/HTTPError/...) for unknown tickers instead of returning None.
+        logger.info("api_get_stock_price unknown symbol=%s", symbol)
+        return JsonResponse({"error": f"Symbol '{symbol}' not found"}, status=404)
+
+    if price is None or not math.isfinite(price):
+        return JsonResponse({"error": f"Symbol '{symbol}' not found"}, status=404)
+
+    change = change_pct = None
+    if prev_close:  # None or 0 -> no change figures, never a ZeroDivisionError
+        change = round(price - prev_close, 2)
+        change_pct = round((price - prev_close) / prev_close * 100, 2)
+
+    return JsonResponse({"symbol": symbol, "price": round(price, 2), "change": change, "change_pct": change_pct})
 
 
-        # Fetch data using yfinance
-    ticker = yf.Ticker(symbol)
-
-    # We use 'fast_info' for speed, or 'history' for reliability
-    # This is faster than downloading the whole history
-    price = ticker.fast_info['last_price']
-    prev_close = ticker.fast_info['previous_close']
-
-    if price is None:
-        return JsonResponse({'error': 'Symbol not found'}, status=404)
-
-        # Calculate change
-    change = price - prev_close
-    change_pct = (change / prev_close) * 100
-
-    data = {
-        'symbol': symbol,
-        'price': round(price, 2),
-        'change': round(change, 2),
-        'change_pct': round(change_pct, 2),
-    }
-    return JsonResponse(data)
+@cached(ANALYST_TTL_S)
+@require_GET
+def stock_overview_api(request, symbol):
+    try:
+        data = get_stock_overview(symbol)
+    except Exception as exc:
+        return _json_error("stock_overview_api", exc)
+    # An unknown symbol is a 404, not a 200 that the client has to inspect.
+    return JsonResponse(sanitize_floats(data), status=404 if "error" in data else 200)
 
 
-# VIEW: React Integration Point (Hybrid Architecture)
-# This view does not return raw data. Instead, it serves the 'container' HTML page
-# that loads our compiled React application (Single Page Application).
-#
-# ARCHITECTURE NOTE:
-# By serving the React app through Django, we maintain a "Monolithic" deployment structure.
-# This simplifies our Azure Container App because we only need to manage ONE container
-# that serves both the API and the Frontend, rather than orchestrating two separate microservices.
-
-def live_watch_view(request):
-    return render(request, 'live_watch.html')
+@cached(ANALYST_TTL_S)
+@require_GET
+def analyst_ratings_api(request, symbol):
+    try:
+        return JsonResponse(sanitize_floats(get_analyst_ratings(symbol)), safe=False)
+    except Exception as exc:
+        return _json_error("analyst_ratings_api", exc)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+@cached(PAGE_TTL_S)
+@require_GET
+def stock_price_history_api(request, symbol):
+    try:
+        data = get_stock_history(symbol, request.GET.get("period", "1y"))
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except Exception as exc:
+        return _json_error("stock_price_history_api", exc)
+    return JsonResponse(sanitize_floats(data), safe=False)

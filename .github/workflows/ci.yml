@@ -1,0 +1,63 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  engine:
+    # C++ order book: unit + differential tests under ASan/UBSan, then an optimised build
+    # validated against one real trading day of Nasdaq order flow (LOBSTER sample).
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake g++
+      - name: tests with sanitizers
+        run: |
+          cmake -S engine -B engine/build-asan -DCMAKE_BUILD_TYPE=Debug -DLOB_SANITIZE=ON
+          cmake --build engine/build-asan -j
+          ctest --test-dir engine/build-asan --output-on-failure
+      - name: release build
+        run: |
+          cmake -S engine -B engine/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build engine/build -j
+          ctest --test-dir engine/build --output-on-failure
+      - uses: actions/cache@v4
+        with:
+          path: data/lobster
+          key: lobster-aapl-2012-06-21-10
+      - name: replay one real trading day (LOBSTER AAPL sample)
+        run: |
+          bash scripts/fetch_lobster.sh
+          engine/build/lobster_replay data/lobster/AAPL_2012-06-21_34200000_57600000_message_10.csv \
+                                      data/lobster/AAPL_2012-06-21_34200000_57600000_orderbook_10.csv | tee replay.txt
+          grep -q "top 9  levels .*= 100.000%" replay.txt   # fail the build if reconstruction regresses
+
+  dashboard-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - run: pytest
+
+  dashboard-container:
+    # Proves the production image builds from a clean checkout and passes its health check.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t marketwatch:ci .
+      - name: start container and wait for /healthz
+        run: |
+          docker run -d --name mw -p 8000:8000 \
+            -e SECRET_KEY=ci-only -e ALLOWED_HOSTS=127.0.0.1,localhost marketwatch:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/healthz; then echo; exit 0; fi
+            sleep 1
+          done
+          docker logs mw
+          exit 1

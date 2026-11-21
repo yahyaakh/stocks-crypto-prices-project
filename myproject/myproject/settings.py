@@ -10,30 +10,34 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
-import os
+from django.core.exceptions import ImproperlyConfigured
 
-
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# All configuration comes from the environment (see .env.example). Nothing secret lives in code.
+DEBUG = os.environ.get("DEBUG", "False") == "True"
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+SECRET_KEY = os.environ.get("SECRET_KEY", "")
+if not SECRET_KEY:
+    if not DEBUG:
+        # Fail fast: a guessable fallback key in production would make signed cookies forgeable.
+        raise ImproperlyConfigured("SECRET_KEY must be set when DEBUG is False")
+    SECRET_KEY = "django-insecure-local-dev-only"
 
+# Third-party API keys. Optional: features that need a missing key degrade to empty results.
+FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "")
+FMP_API_KEY = os.environ.get("FMP_API_KEY", "")
 
+# News-tone model: "lexicon" (default, tiny) or "finbert" (needs requirements-finbert.txt; +2.3 GB image).
+SENTIMENT_MODEL = os.environ.get("SENTIMENT_MODEL", "lexicon")
+# Created by `python scripts/fetch_sentiment_data.py lexicon` (git-ignored data/ folder).
+SENTIMENT_LEXICON_PATH = os.environ.get(
+    "SENTIMENT_LEXICON_PATH", str(BASE_DIR.parent / "data" / "sentiment" / "lm_words.json"))
 
-# Load environment variables
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key')
-
-# API Keys
-FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY', '')
-
-
-
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 
 
 # Application definition
@@ -91,10 +95,12 @@ STATIC_ROOT = BASE_DIR / "staticfiles_production"
 
 
 
-'''WhiteNoise is NOT where you store static files. 
-It's a tool that serves your static files efficiently in production.'''
-# Enable WhiteNoise compression and caching
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+# WhiteNoise serves the collected files with compression + hashed names (long-lived caching).
+# Django >= 5.1 only reads STORAGES; the old STATICFILES_STORAGE setting is silently ignored.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}
 
 
 
@@ -165,8 +171,23 @@ CACHES = {
     }
 }
 
-# this is needed for React
+# Vite dev server (React) calls the API cross-origin during development.
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+# One line per event, key=value fields, to stdout (container logs / journald pick it up).
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "kv": {"format": "ts=%(asctime)s level=%(levelname)s logger=%(name)s msg=\"%(message)s\""},
+    },
+    "handlers": {"stdout": {"class": "logging.StreamHandler", "formatter": "kv"}},
+    "root": {"handlers": ["stdout"], "level": os.environ.get("LOG_LEVEL", "INFO")},
+    "loggers": {
+        # yfinance is very chatty at INFO.
+        "yfinance": {"level": "WARNING"},
+    },
+}

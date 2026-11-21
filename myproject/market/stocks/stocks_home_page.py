@@ -1,35 +1,9 @@
-from datetime import datetime
+import logging
 
 import pandas as pd
-import json
-import requests
 import yfinance as yf
-import datetime as dt
-from datetime import datetime, timezone
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-
-def get_biggest_etf_stock_prices():
-    start = dt.date.today() - dt.timedelta(days=7)  # buffer over weekends/holidays
-    end = None
-
-    tickers = ['SPY', 'VTI', 'QQQ', 'IWM', 'VT', 'VXUS', 'BND', 'TLT', 'LQD', 'HYG', 'GLD', 'VNQ']
-
-    close_prices = pd.DataFrame()
-
-    for ticker in tickers:
-        data = yf.download(ticker, start, end)
-        close_prices[ticker] = data['Close']
-
-    if close_prices.empty:
-        return []  # nothing fetched
-
-    out = close_prices.tail(1).T.reset_index()
-
-    out.columns = ["symbol", "price"]
-    return out.to_dict(orient="records")
-
+logger = logging.getLogger(__name__)
 
 
 # Yahoo tickers for major indices
@@ -77,15 +51,12 @@ def _nearest_past_value(series: pd.Series, target_ts: pd.Timestamp):
         return None
 
 def _rows_for_group(close_df: pd.DataFrame, group):
-    # close_df: columns are tickers; index are timestamps (daily)
+    """One row per index. Each index is measured against its OWN last two closes, so a market
+    that was closed today (holiday, different time zone) shows its last real session instead of
+    a 0.00 change against itself. `as_of` is the date of that last close."""
     rows = []
     if close_df.empty:
         return rows
-    last_ts = close_df.index[-1]
-    prev_ts = close_df.index[-2] if len(close_df.index) >= 2 else last_ts
-
-    one_month_ts = last_ts - pd.Timedelta(days=30)
-    one_year_ts  = last_ts - pd.Timedelta(days=365)
 
     for item in group:
         sym, name = item["symbol"], item["name"]
@@ -96,26 +67,26 @@ def _rows_for_group(close_df: pd.DataFrame, group):
         if series.empty:
             continue
 
-        last = _nearest_past_value(series, last_ts)
-        prev = _nearest_past_value(series, prev_ts)
-        m1   = _nearest_past_value(series, one_month_ts)
-        y1   = _nearest_past_value(series, one_year_ts)
+        last_ts = series.index[-1]
+        last = float(series.iloc[-1])
+        prev = float(series.iloc[-2]) if len(series) >= 2 else None
+        m1 = _nearest_past_value(series, last_ts - pd.Timedelta(days=30))
+        y1 = _nearest_past_value(series, last_ts - pd.Timedelta(days=365))
 
-        change      = (last - prev) if (last is not None and prev is not None) else None
-        pct_change  = _pct(last, prev)
-        pct_m1      = _pct(last, m1)
-        pct_y1      = _pct(last, y1)
+        change = (last - prev) if prev is not None else None
+        pct_change = _pct(last, prev)
+        pct_m1 = _pct(last, m1)
+        pct_y1 = _pct(last, y1)
 
         rows.append({
             "symbol": sym,
             "name": name,
-            "value": round(last, 2) if last is not None else None,
+            "value": round(last, 2),
             "change": round(change, 2) if change is not None else None,
             "pct_change": round(pct_change, 2) if pct_change is not None else None,
             "m1": round(pct_m1, 2) if pct_m1 is not None else None,
             "y1": round(pct_y1, 2) if pct_y1 is not None else None,
-            # Daily data → treat as midnight EDT for display, like your sample
-            "time_edt": "12:00 AM",
+            "as_of": last_ts.date().isoformat(),
         })
     return rows
 
@@ -134,44 +105,12 @@ def get_world_indices_tables():
     if "Close" not in df.columns.levels[0]:
         return {"americas": [], "emea": [], "apac": []}
 
-    close = df["Close"].ffill().bfill()
+    # ffill only: carry the last known close forward over holidays. bfill would copy a
+    # *later* price backwards in time (look-ahead), which silently corrupts 1M/1Y changes.
+    close = df["Close"].ffill()
 
     return {
         "americas": _rows_for_group(close, WORLD_INDICES["americas"]),
         "emea":     _rows_for_group(close, WORLD_INDICES["emea"]),
         "apac":     _rows_for_group(close, WORLD_INDICES["apac"]),
     }
-
-
-
-def get_general_stock_news_yf(limit_total=50):
-    symbols = [
-        "^GSPC", "^DJI", "^IXIC", "SPY", "QQQ",
-        "AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "NVDA",
-        "JPM", "BAC", "XOM", "WMT", "UNH", "LLY",
-    ]  # trim to 18 most newsworthy — less is faster
-
-    def fetch_news(sym):
-        try:
-            return yf.Ticker(sym).news or []
-        except Exception:
-            return []
-
-    items, seen = [], set()
-    with ThreadPoolExecutor(max_workers=6) as executor:
-        futures = {executor.submit(fetch_news, s): s for s in symbols}
-        for future in as_completed(futures):
-            for it in future.result():
-                content = it.get("content") or {}
-                title = it.get("title") or content.get("title") or ""
-                link = (it.get('link')
-                        or (content.get('clickThroughUrl') or {}).get('url')
-                        or (content.get('canonicalUrl') or {}).get('url')
-                        or content.get('previewUrl'))
-                summary = it.get("summary") or content.get("summary") or ""
-                if link and link not in seen:
-                    seen.add(link)
-                    items.append({"title": title, "link": link, "summary": summary})
-
-    return items[:limit_total]
-

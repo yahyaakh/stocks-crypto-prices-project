@@ -1,19 +1,18 @@
 {% extends "base.html" %}
-{% load humanize %} 
-{% block title %}ETF Market Overview - Market Mini{% endblock %}
+{% load humanize market_format %}
+{% block title %}ETF Market Overview - Market Watch{% endblock %}
 
 {% block content %}
 <div class="etf-page">
-    
-    <div class="etf-header">
+
+    <header class="etf-header">
         <h1>📊 ETF Market Overview</h1>
         <p class="subtitle">Exchange-Traded Funds across all major categories</p>
-    </div>
+    </header>
 
     <div class="etf-controls">
-        <input type="search" id="etf-search" placeholder="Search by symbol, name, or category..." class="search-input">
-        
-        <select id="category-filter" class="filter-select">
+        <input type="search" id="etf-search" placeholder="Search by symbol, name, or category..." aria-label="Search ETFs">
+        <select id="category-filter" aria-label="Filter by category">
             <option value="">All Categories</option>
             <option value="Broad Market">Broad Market</option>
             <option value="Technology">Technology</option>
@@ -21,42 +20,39 @@
             <option value="Bonds">Bonds</option>
             <option value="International">International</option>
             <option value="Commodities">Commodities</option>
-            <option value="Growth">Growth</option>
             <option value="Dividend">Dividend</option>
-            <option value="Small/Mid Cap">Small/Mid Cap</option>
         </select>
     </div>
 
     {% if etfs %}
     <div class="etf-stats">
-        <div class="stat-card">
-            <div class="stat-icon">📈</div>
-            <div class="stat-content">
+        <article class="stat-card">
+            <span class="stat-icon" aria-hidden="true">📈</span>
+            <div>
                 <div class="stat-value">{{ etfs|length }}</div>
                 <div class="stat-label">Total ETFs</div>
             </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon" id="gainers-icon">🟢</div>
-            <div class="stat-content">
-                <div class="stat-value" id="gainers-count">-</div>
-                <div class="stat-label">Gainers Today</div>
+        </article>
+        <article class="stat-card gainers">
+            <span class="stat-icon" aria-hidden="true">▲</span>
+            <div>
+                <div class="stat-value" id="gainers-count">–</div>
+                <div class="stat-label">Gainers today</div>
             </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon" id="losers-icon">🔴</div>
-            <div class="stat-content">
-                <div class="stat-value" id="losers-count">-</div>
-                <div class="stat-label">Losers Today</div>
+        </article>
+        <article class="stat-card losers">
+            <span class="stat-icon" aria-hidden="true">▼</span>
+            <div>
+                <div class="stat-value" id="losers-count">–</div>
+                <div class="stat-label">Losers today</div>
             </div>
-        </div>
+        </article>
     </div>
     {% endif %}
 
-    <section class="etf-table-section">
+    <section>
         {% if etfs %}
-        
-        <div class="table-wrapper">
+        <div class="table-container">
             <table class="etf-table">
                 <thead>
                 <tr>
@@ -65,167 +61,202 @@
                     <th scope="col">Category</th>
                     <th scope="col" class="num">Price</th>
                     <th scope="col" class="num">Change</th>
-                    <th scope="col" class="num">Day %</th>
-                    <th scope="col" class="num">Week %</th>
-                    <th scope="col" class="num">Month %</th>
-                    <th scope="col" class="num">Year %</th>
+                    <th scope="col" class="num">Day</th>
+                    <th scope="col" class="num">Week</th>
+                    <th scope="col" class="num">Month</th>
+                    <th scope="col" class="num">Year</th>
                     <th scope="col" class="num">Volume</th>
                 </tr>
                 </thead>
                 <tbody>
-                
                 {% for etf in etfs %}
-                
-                <tr class="etf-row" data-category="{{ etf.category }}">
-                    
-                    <td class="symbol-cell">
-                        <span class="symbol-badge">{{ etf.symbol }}</span>
-                    </td>
-                    <td class="name-cell">
-                        <strong>{{ etf.name }}</strong>
-                    </td>
-                    <td class="category-cell">
-                        <span class="category-tag">{{ etf.category }}</span>
-                    </td>
-                    
-                    <td class="num price-cell">
-                        ${{ etf.price|floatformat:2 }}
-                    </td>
-                    
-                    <td class="num">
-                        <span class="change-val {% if etf.change >= 0 %}positive{% else %}negative{% endif %}">
-                            ${{ etf.change|floatformat:2 }}
-                        </span>
-                    </td>
-                    <td class="num">
-                        <span class="change-val {% if etf.change_pct >= 0 %}positive{% else %}negative{% endif %}">
-                            {{ etf.change_pct|floatformat:2 }}%
-                        </span>
-                    </td>
-                    
-                    <td class="num">
-                        <span class="change-val {% if etf.week_change_pct >= 0 %}positive{% else %}negative{% endif %}">
-                            {{ etf.week_change_pct|floatformat:2 }}%
-                        </span>
-                    </td>
-                    <td class="num">
-                        <span class="change-val {% if etf.month_change_pct >= 0 %}positive{% else %}negative{% endif %}">
-                            {{ etf.month_change_pct|floatformat:2 }}%
-                        </span>
-                    </td>
-                    <td class="num">
-                        <span class="change-val {% if etf.year_change_pct >= 0 %}positive{% else %}negative{% endif %}">
-                            {{ etf.year_change_pct|floatformat:2 }}%
-                        </span>
-                    </td>
-                    
-                    <td class="num volume-cell">
-                        {{ etf.volume|intcomma }}
-                    </td>
+                <tr class="etf-row" data-category="{{ etf.category }}" data-day="{{ etf.change_pct|direction }}">
+                    <td class="symbol-cell">{{ etf.symbol }}</td>
+                    <td class="name-cell">{{ etf.name }}</td>
+                    <td><span class="category-tag">{{ etf.category }}</span></td>
+                    <td class="num price-cell">{{ etf.price|money }}</td>
+                    <td class="num"><span class="change-val {{ etf.change|direction }}">{{ etf.change|signed_money }}</span></td>
+                    <td class="num"><span class="change-val {{ etf.change_pct|direction }}">{{ etf.change_pct|signed_pct }}</span></td>
+                    <td class="num"><span class="change-val {{ etf.week_change_pct|direction }}">{{ etf.week_change_pct|signed_pct }}</span></td>
+                    <td class="num"><span class="change-val {{ etf.month_change_pct|direction }}">{{ etf.month_change_pct|signed_pct }}</span></td>
+                    <td class="num"><span class="change-val {{ etf.year_change_pct|direction }}">{{ etf.year_change_pct|signed_pct }}</span></td>
+                    <td class="num volume-cell">{% if etf.volume %}{{ etf.volume|intcomma }}{% else %}—{% endif %}</td>
                 </tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
-        
+        <p class="no-results" id="no-results" hidden>No ETFs match your search.</p>
         {% else %}
         <div class="empty-state">
             <div class="empty-icon">📭</div>
-            <h2>No ETF Data Available</h2>
-            <p>Unable to load ETF data at this time.</p>
+            <h2>No ETF data available</h2>
+            <p>Unable to load ETF data at this time. Try again in a minute.</p>
         </div>
         {% endif %}
     </section>
 
     <aside class="info-card">
         <h3>💡 About ETFs</h3>
-        <p><strong>Exchange-Traded Funds (ETFs)</strong> are investment funds that trade on stock exchanges...</p>
-        <div class="category-guide">
-            <h4>Categories Explained:</h4>
-            <ul>
-                <li><strong>Broad Market:</strong> S&P 500, Total Market exposure</li>
-                <li><strong>Technology:</strong> Tech-focused funds (QQQ, semiconductors)</li>
-                </ul>
-        </div>
+        <p><strong>Exchange-Traded Funds (ETFs)</strong> are investment funds that trade on stock exchanges like a
+            single stock, while holding a basket of assets such as stocks, bonds or commodities.</p>
+        <h4>Categories</h4>
+        <ul>
+            <li><strong>Broad Market:</strong> S&amp;P 500, total US and total world equity.</li>
+            <li><strong>Technology:</strong> Nasdaq-100 and technology-sector funds.</li>
+            <li><strong>Sector:</strong> single US sectors: financials, energy, health care, industrials, real estate.</li>
+            <li><strong>Bonds:</strong> US aggregate and long-duration Treasury bonds.</li>
+            <li><strong>International:</strong> developed markets ex-US and emerging markets.</li>
+            <li><strong>Commodities:</strong> physical gold and silver.</li>
+            <li><strong>Dividend:</strong> high-dividend-yield US equities.</li>
+        </ul>
+        <p class="footnote">Prices are daily closes (dividend-adjusted) from Yahoo Finance, cached for 5 minutes.
+            Week/Month/Year compare against the last close on or before 7/30/365 calendar days ago.</p>
     </aside>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <style>
-    /* CSS Styling  */
-    .etf-page {
-        max-width: 1600px;
-        margin: 0 auto;
-        padding: 1rem;
-    }
-    
+    .etf-page { max-width: 1400px; margin: 0 auto; }
 
-    /* Responsive Design. I use Media Queries to adjust font sizes and hide non-essential elements on mobile. */
+    .etf-header {
+        text-align: center;
+        margin-bottom: 1.5rem;
+        padding: 2rem 1rem;
+        background: linear-gradient(135deg, #1095c1 0%, #0d7fa3 100%);
+        color: #fff;
+        border-radius: var(--pico-border-radius);
+    }
+    .etf-header h1 { margin: 0 0 0.5rem; color: #fff; font-size: 2rem; }
+    .etf-header .subtitle { margin: 0; opacity: 0.95; font-size: 1.1rem; }
+
+    .etf-controls {
+        display: grid;
+        grid-template-columns: 1fr 240px;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    .etf-controls input, .etf-controls select { margin-bottom: 0; }
+
+    /* Three summary cards side by side */
+    .etf-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .stat-card {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin: 0;
+        padding: 1rem 1.25rem;
+    }
+    .stat-icon {
+        display: grid;
+        place-items: center;
+        width: 2.75rem;
+        height: 2.75rem;
+        flex: none;
+        border-radius: 50%;
+        font-size: 1.25rem;
+        background: var(--pico-secondary-background);
+        color: var(--pico-contrast);
+    }
+    .stat-card.gainers .stat-icon { background: rgba(76, 175, 80, 0.15); color: #2d7d46; }
+    .stat-card.losers .stat-icon { background: rgba(239, 83, 80, 0.15); color: #c62828; }
+    .stat-value { font-size: 1.75rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .stat-label { color: var(--pico-muted-color); font-size: 0.9rem; }
+
+    /* Table */
+    .table-container {
+        overflow-x: auto;
+        border-radius: var(--pico-border-radius);
+        border: 1px solid var(--pico-card-border-color);
+    }
+    .etf-table { margin: 0; width: 100%; }
+    .etf-table th { white-space: nowrap; }
+    .etf-table tbody tr:hover { background-color: var(--pico-table-row-stripped-background-color); }
+    .symbol-cell { font-weight: 700; color: var(--pico-primary); letter-spacing: 0.5px; }
+    .name-cell { font-weight: 500; min-width: 200px; }
+    .category-tag {
+        display: inline-block;
+        padding: 0.15rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        white-space: nowrap;
+        background: var(--pico-secondary-background);
+        color: var(--pico-secondary-inverse);
+    }
+    .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .price-cell { font-weight: 600; }
+    .volume-cell { color: var(--pico-muted-color); }
+
+    /* Change pills: colour + arrow (not colour alone, for colour-blind readers) */
+    .change-val {
+        display: inline-block;
+        padding: 0.2rem 0.55rem;
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 0.9rem;
+    }
+    .change-val.positive { background: rgba(76, 175, 80, 0.12); color: #2d7d46; }
+    .change-val.negative { background: rgba(239, 83, 80, 0.12); color: #c62828; }
+    .change-val.flat, .change-val.missing { color: var(--pico-muted-color); }
+    .change-val.positive::before { content: "▲ "; font-size: 0.7rem; }
+    .change-val.negative::before { content: "▼ "; font-size: 0.7rem; }
+
+    .no-results, .empty-state { text-align: center; padding: 2rem 1rem; color: var(--pico-muted-color); }
+    .empty-icon { font-size: 2.5rem; }
+
+    .info-card { margin-top: 2rem; }
+    .info-card h4 { margin: 1rem 0 0.5rem; }
+    .info-card ul { margin-bottom: 0.75rem; }
+    .info-card .footnote { font-size: 0.85rem; color: var(--pico-muted-color); margin: 0; }
+
+    @media (prefers-color-scheme: dark) {
+        .etf-header { background: linear-gradient(135deg, #0d7fa3 0%, #095d7a 100%); }
+        .change-val.positive, .stat-card.gainers .stat-icon { color: #4caf50; }
+        .change-val.negative, .stat-card.losers .stat-icon { color: #ef5350; }
+    }
+
     @media (max-width: 768px) {
-        .etf-controls { flex-direction: column; }
+        .etf-controls { grid-template-columns: 1fr; }
+        .etf-stats { grid-template-columns: 1fr; }
         .etf-table { font-size: 0.85rem; }
     }
 </style>
 
 <script>
-    // INTERVIEW TIP: Waiting for DOMContentLoaded ensures HTML is fully parsed before JS tries to find elements.
-    document.addEventListener('DOMContentLoaded', function() {
-        
-        // 1. SELECTING ELEMENTS
+    document.addEventListener('DOMContentLoaded', function () {
         const searchInput = document.getElementById('etf-search');
         const categoryFilter = document.getElementById('category-filter');
-        const rows = document.querySelectorAll('.etf-row');
+        const noResults = document.getElementById('no-results');
+        const rows = Array.from(document.querySelectorAll('.etf-row'));
 
-        // 2. CLIENT-SIDE FILTERING FUNCTION
-        // INTERVIEW TIP: This function runs on every keystroke. It's fast because I'm toggling CSS 'display', not reloading the page.
+        // Client-side filtering: toggles row visibility, no page reload.
         function filterTable() {
-            const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
-            const selectedCategory = categoryFilter ? categoryFilter.value : '';
-
+            const term = searchInput.value.trim().toLowerCase();
+            const category = categoryFilter.value;
+            let visible = 0;
             rows.forEach(row => {
-                // Getting text from the row for search
-                const text = row.textContent.toLowerCase();
-                
-                // Getting the hidden data attribute for filtering
-                const category = row.dataset.category;
-
-                const matchesSearch = text.includes(searchTerm);
-                // Logic: If no category selected (!selectedCategory) OR category matches, return true
-                const matchesCategory = !selectedCategory || category === selectedCategory;
-
-                // Toggle visibility
-                row.style.display = (matchesSearch && matchesCategory) ? '' : 'none';
+                const show = row.textContent.toLowerCase().includes(term)
+                    && (!category || row.dataset.category === category);
+                row.hidden = !show;
+                visible += show;
             });
+            if (noResults) noResults.hidden = visible > 0;
         }
+        searchInput.addEventListener('input', filterTable);
+        categoryFilter.addEventListener('change', filterTable);
 
-        // Attaching Event Listeners
-        if (searchInput) searchInput.addEventListener('input', filterTable);
-        if (categoryFilter) categoryFilter.addEventListener('change', filterTable);
-
-        // 3. STATS CALCULATION
-        //  Calculating 'Gainers vs Losers' on the client side.
-        // This offloads work from the server and keeps the UI logic self-contained.
-        let gainers = 0;
-        let losers = 0;
-
-        document.querySelectorAll('.etf-row').forEach(row => {
-            // I look for the 6th column (Day %) specifically
-            const changeCell = row.querySelector('td:nth-child(6) .change-val');
-            if (changeCell) {
-                // Checking class list is safer than parsing innerHTML symbols like '+' or '-'
-                const hasPositive = changeCell.classList.contains('positive');
-                if (hasPositive) gainers++;
-                else losers++;
-            }
-        });
-
-        // Updating the UI
-        const gainersCount = document.getElementById('gainers-count');
-        const losersCount = document.getElementById('losers-count');
-
-        if (gainersCount) gainersCount.textContent = gainers;
-        if (losersCount) losersCount.textContent = losers;
+        // Gainers / losers from the server-computed day direction (flat or missing counts as neither).
+        const count = dir => rows.filter(r => r.dataset.day === dir).length;
+        const g = document.getElementById('gainers-count');
+        const l = document.getElementById('losers-count');
+        if (g) g.textContent = count('positive');
+        if (l) l.textContent = count('negative');
     });
 </script>
 {% endblock %}

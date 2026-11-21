@@ -1,0 +1,10 @@
+# Optional: FinBERT headline sentiment (SENTIMENT_MODEL=finbert). The Docker image grows from 569 MB
+# to 2.91 GB (measured); the default lexicon
+# model needs none of this. CPU-only PyTorch: the "+cpu" build exists only on PyTorch's own index,
+# so pinning it here keeps pip from pulling the multi-GB CUDA build from PyPI.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.15.0+cpu
+transformers==5.24.0
+tokenizers==0.23.3
+safetensors==0.8.0
+huggingface_hub==2.4.0

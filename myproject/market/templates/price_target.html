@@ -1,75 +1,87 @@
 {% extends "base.html" %}
-{% load humanize %}
-
-{% block title %}Analyst Targets — {{ symbol }}{% endblock %}
+{% load market_format %}
+{% block title %}Analyst Targets — {{ symbol }} - Market Watch{% endblock %}
 
 {% block content %}
-<section class="container">
-    <!-- Symbol input -->
-    <form method="get" class="row g-2 mb-4">
-        <div class="col-auto">
-            <input type="text" name="symbol" value="{{ symbol }}" placeholder="e.g. MSFT"
-                   class="form-control" required>
-        </div>
-        <div class="col-auto">
-            <button class="btn btn-primary" type="submit">Show</button>
-        </div>
-    </form>
-
-    {% if targets %}
-    <header class="mb-3">
-        <h1 class="h4 mb-1">Analyst Price Targets for <strong>{{ symbol }}</strong></h1>
-        <div class="text-muted small">Source: yfinance analyst_price_targets</div>
+<div class="target-page">
+    <header class="target-header">
+        <h1>🎯 Analyst Price Targets</h1>
+        <p class="subtitle">Where Wall Street analysts expect the price in 12 months</p>
     </header>
 
-    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3 mb-4">
-        <div class="col">
-            <div class="card h-100"><div class="card-body">
-                <div class="text-muted small">Current Price</div>
-                <div class="fs-4">{{ targets.current|floatformat:2 }}</div>
-            </div></div>
-        </div>
-        <div class="col">
-            <div class="card h-100"><div class="card-body">
-                <div class="text-muted small">Mean Target</div>
-                <div class="fs-5">{{ targets.mean|floatformat:2 }}</div>
-                {% if targets.mean and targets.current %}
-                {% if targets.mean > targets.current %}
-                <span class="badge text-bg-success">Upside vs. current</span>
-                {% elif targets.mean < targets.current %}
-                <span class="badge text-bg-danger">Downside vs. current</span>
-                {% else %}
-                <span class="badge text-bg-secondary">At current</span>
-                {% endif %}
-                {% endif %}
-            </div></div>
-        </div>
-        <div class="col">
-            <div class="card h-100"><div class="card-body">
-                <div class="text-muted small">Median Target</div>
-                <div class="fs-5">{{ targets.median|floatformat:2 }}</div>
-            </div></div>
-        </div>
-        <div class="col">
-            <div class="card h-100"><div class="card-body">
-                <div class="text-muted small">High Target</div>
-                <div class="fs-5">{{ targets.high|floatformat:2 }}</div>
-            </div></div>
-        </div>
-        <div class="col">
-            <div class="card h-100"><div class="card-body">
-                <div class="text-muted small">Low Target</div>
-                <div class="fs-5">{{ targets.low|floatformat:2 }}</div>
-            </div></div>
-        </div>
+    <form method="get" role="search">
+        <input type="search" name="symbol" value="{{ symbol }}" placeholder="Symbol, e.g. MSFT" aria-label="Symbol" required>
+        <button type="submit">Show</button>
+    </form>
+
+    {% if targets and targets.current %}
+    <h2 class="target-title">{{ symbol }} <small>current price {{ targets.current|money }}</small></h2>
+
+    <div class="target-grid">
+        {% with cur=targets.current %}
+        <article class="target-card">
+            <div class="target-label">Mean target</div>
+            <div class="target-value">{{ targets.mean|money }}</div>
+            {% with d=targets.mean|pct_vs:cur %}<span class="change-val {{ d|direction }}">{{ d|signed_pct }} vs current</span>{% endwith %}
+        </article>
+        <article class="target-card">
+            <div class="target-label">Median target</div>
+            <div class="target-value">{{ targets.median|money }}</div>
+            {% with d=targets.median|pct_vs:cur %}<span class="change-val {{ d|direction }}">{{ d|signed_pct }} vs current</span>{% endwith %}
+        </article>
+        <article class="target-card">
+            <div class="target-label">High target</div>
+            <div class="target-value">{{ targets.high|money }}</div>
+            {% with d=targets.high|pct_vs:cur %}<span class="change-val {{ d|direction }}">{{ d|signed_pct }} vs current</span>{% endwith %}
+        </article>
+        <article class="target-card">
+            <div class="target-label">Low target</div>
+            <div class="target-value">{{ targets.low|money }}</div>
+            {% with d=targets.low|pct_vs:cur %}<span class="change-val {{ d|direction }}">{{ d|signed_pct }} vs current</span>{% endwith %}
+        </article>
+        {% endwith %}
     </div>
 
-    <div class="alert alert-info">
-        Targets represent analyst estimates and are not guarantees. Always do your own research.
-    </div>
-
+    <p class="footnote">Source: Yahoo Finance consensus of analyst 12-month targets. Targets are estimates, not
+        guarantees, and analysts' forecasts have a wide spread (see high vs low).</p>
     {% else %}
-    <div class="alert alert-warning">No target data found for <strong>{{ symbol }}</strong>. Try another symbol.</div>
+    <article class="empty-state">No analyst targets found for <strong>{{ symbol }}</strong>. Try another symbol.</article>
     {% endif %}
-</section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+    .target-page { max-width: 1100px; margin: 0 auto; }
+    .target-header {
+        text-align: center;
+        margin-bottom: 1.5rem;
+        padding: 2rem 1rem;
+        background: linear-gradient(135deg, #1095c1 0%, #0d7fa3 100%);
+        color: #fff;
+        border-radius: var(--pico-border-radius);
+    }
+    .target-header h1 { margin: 0 0 0.5rem; color: #fff; font-size: 2rem; }
+    .target-header .subtitle { margin: 0; opacity: 0.95; }
+    form[role="search"] { max-width: 500px; margin: 0 auto 1.5rem; }
+    .target-title { margin-bottom: 1rem; }
+    .target-title small { font-size: 1rem; font-weight: 400; color: var(--pico-muted-color); margin-left: 0.5rem; }
+    .target-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+    .target-card { margin: 0; }
+    .target-label { color: var(--pico-muted-color); font-size: 0.9rem; }
+    .target-value { font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0 0.5rem; font-variant-numeric: tabular-nums; }
+    .change-val { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 4px; font-weight: 700; font-size: 0.85rem; }
+    .change-val.positive { background: rgba(76, 175, 80, 0.12); color: #2d7d46; }
+    .change-val.negative { background: rgba(239, 83, 80, 0.12); color: #c62828; }
+    .change-val.flat, .change-val.missing { color: var(--pico-muted-color); }
+    .footnote { margin-top: 1.5rem; font-size: 0.85rem; color: var(--pico-muted-color); }
+    .empty-state { text-align: center; color: var(--pico-muted-color); }
+    @media (prefers-color-scheme: dark) {
+        .target-header { background: linear-gradient(135deg, #0d7fa3 0%, #095d7a 100%); }
+        .change-val.positive { color: #4caf50; }
+        .change-val.negative { color: #ef5350; }
+    }
+    @media (max-width: 900px) { .target-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 500px) { .target-grid { grid-template-columns: 1fr; } }
+</style>
 {% endblock %}

@@ -1,53 +1,41 @@
+"""Upcoming IPO calendar from Finnhub."""
+
+import logging
+from datetime import date, timedelta
+
 import finnhub
-from datetime import datetime, timedelta
 from django.conf import settings
 
-import os
-import sys
-import django
+logger = logging.getLogger(__name__)
 
-today = datetime.now()
-one_year_later = today + timedelta(days=365)
-
-# ipo
-
-def ipo(fromDate: datetime | None, toDate: datetime | None):
-    # 1. Connect to API
-    finnhub_client = finnhub.Client(api_key=settings.FINNHUB_API_KEY)
-
-    # 2. Format Dates (API requires YYYY-MM-DD strings)
-    # Convert datetime objects to string format "YYYY-MM-DD"
-    from_str = fromDate.strftime("%Y-%m-%d") if fromDate else None
-    to_str = toDate.strftime("%Y-%m-%d") if toDate else None
-    
-    # 3. Fetch Data
-    results = finnhub_client.ipo_calendar(_from=from_str, to=to_str)
-
-    return results if results else {}
+IPO_FIELDS = ("date", "exchange", "name", "numberOfShares", "price", "symbol", "totalSharesValue", "status")
+LOOKBACK_DAYS = 30    # recent IPOs: the upcoming calendar is often empty on the free tier
+LOOKAHEAD_DAYS = 365
 
 
-def show_ipo():
-
-    # 4. Define Range (Today -> +365 Days)
-    results = ipo(today, one_year_later)
-    rows = []
-    ipo_list = results.get('ipoCalendar', [])
-    for row in ipo_list:
-        # We use .get() OR None to prevent crashes if a field is missing
-        date = row.get("date") or None
-        exchange = row.get("exchange") or None
-        name = row.get("name") or None
-        numberOfShares = row.get("numberOfShares") or None
-        price = row.get("price") or None
-        symbol = row.get("symbol") or None
-        totalSharesValue = row.get("totalSharesValue") or None
-        rows.append({"date": date, "exchange": exchange, "name": name, "numberOfShares": numberOfShares , "price": price, "symbol": symbol, "totalSharesValue": totalSharesValue})
-
-    return rows
+def ipo(from_date: date, to_date: date) -> dict:
+    if not settings.FINNHUB_API_KEY:
+        logger.warning("FINNHUB_API_KEY not set; IPO calendar disabled")
+        return {}
+    client = finnhub.Client(api_key=settings.FINNHUB_API_KEY)
+    try:
+        return client.ipo_calendar(_from=from_date.isoformat(), to=to_date.isoformat()) or {}
+    except Exception as exc:  # finnhub raises its own exception types plus requests errors
+        logger.warning("finnhub ipo_calendar failed err=%s", exc)
+        return {}
 
 
-# Data Normalization: "External APIs are often messy.
-# Some companies might not have a set price or share count yet. 
-# My show_ipo function acts as a cleaning layer. 
-# It standardizes the data structure so my frontend receives a consistent list of dictionaries, 
-# replacing missing values with None."
+def show_ipo(today: date | None = None) -> list[dict]:
+    """IPOs from 30 days ago to +365 days, upcoming first (soonest first), then recent (newest first).
+    Dates are computed per call, not at import time, so a long-running server never serves a
+    stale window."""
+    today = today or date.today()
+    results = ipo(today - timedelta(days=LOOKBACK_DAYS), today + timedelta(days=LOOKAHEAD_DAYS))
+    # Normalise: every row has every field; missing/empty values become None.
+    rows = [{f: row.get(f) or None for f in IPO_FIELDS} for row in results.get("ipoCalendar", [])]
+    iso_today = today.isoformat()
+    for r in rows:
+        r["upcoming"] = (r["date"] or "") >= iso_today
+    upcoming = sorted((r for r in rows if r["upcoming"]), key=lambda r: r["date"] or "")
+    recent = sorted((r for r in rows if not r["upcoming"]), key=lambda r: r["date"] or "", reverse=True)
+    return upcoming + recent

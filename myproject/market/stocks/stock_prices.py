@@ -1,8 +1,12 @@
+import logging
+
 import pandas as pd
 import yfinance as yf
 import datetime as dt
 from math import isfinite
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────
@@ -17,28 +21,6 @@ def get_stock_information(symbol: str | None):
 def get_target_price(symbol: str | None):
     s = yf.Ticker(symbol)
     return s.analyst_price_targets
-
-
-def get_stock_news(symbol: str | None, limit: int = 20):
-    if symbol is None:
-        return []
-    y = yf.Ticker(symbol)
-    items = y.news or []
-    rows = []
-
-    for n in items[:limit]:
-        content = n.get('content') or {}
-        title   = n.get('title')   or content.get('title')
-        summary = n.get('summary') or content.get('summary') or content.get('description')
-        link = (n.get('link')
-                or (content.get('clickThroughUrl') or {}).get('url')
-                or (content.get('canonicalUrl')    or {}).get('url')
-                or content.get('previewUrl'))
-
-        if title or link:
-            rows.append({"title": title, "link": link, "summary": summary, "content": content})
-
-    return rows
 
 
 # ─────────────────────────────────────────────
@@ -156,7 +138,7 @@ def get_biggest_etf_stock_prices():
             })
 
         except Exception as e:
-            print(f"Error processing ETF {symbol}: {e}")
+            logger.warning("etf row failed symbol=%s err=%s", symbol, e)
             continue
 
     results.sort(key=lambda x: (x['category'], x['symbol']))
@@ -252,7 +234,7 @@ def get_magnificent7_prices():
             })
 
         except Exception as e:
-            print(f"Error processing Mag7 {ticker}: {e}")
+            logger.warning("mag7 row failed symbol=%s err=%s", ticker, e)
             continue
 
     return results

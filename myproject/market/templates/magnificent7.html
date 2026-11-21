@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% load humanize %}
-{% block title %}Magnificent 7 Stocks{% endblock %}
+{% load humanize market_format %}
+{% block title %}Magnificent 7 Stocks - Market Watch{% endblock %}
 
 {% block content %}
 <div class="dashboard-header">
@@ -31,16 +31,12 @@
                         <strong>{{ stock.symbol }}</strong>
                     </td>
                     <td class="name-cell">{{ stock.name }}</td>
-                    <td class="num price-cell">${{ stock.price }}</td>
+                    <td class="num price-cell">{{ stock.price|money }}</td>
                     <td class="num">
-                        <span class="change-val {% if stock.change >= 0 %}positive{% else %}negative{% endif %}">
-                            ${{ stock.change }}
-                        </span>
+                        <span class="change-val {{ stock.change|direction }}">{{ stock.change|signed_money }}</span>
                     </td>
                     <td class="num">
-                        <span class="change-val {% if stock.change_pct >= 0 %}positive{% else %}negative{% endif %}">
-                            {{ stock.change_pct }}%
-                        </span>
+                        <span class="change-val {{ stock.change_pct|direction }}">{{ stock.change_pct|signed_pct }}</span>
                     </td>
                     <td class="num volume-cell">
                         {% if stock.volume %}
