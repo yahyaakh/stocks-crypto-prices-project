@@ -3,7 +3,7 @@
 A stock and crypto dashboard (Django + React, deployed on Azure Container Apps) and a C++
 limit order book that reconstructs a real Nasdaq trading day exactly.
 
-**Live:** https://marketwatch.greenforest-7693b512.germanywestcentral.azurecontainerapps.io
+**Live:** https://marketwatch.yahyaakh.dev
 (scales to zero, so the first request after a quiet period can take tens of seconds)
 
 The repository has two independent parts:
