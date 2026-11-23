@@ -12,22 +12,23 @@
 
 <div class="dashboard-header">
     <h1>Market Dashboard</h1>
-    <p class="subtitle">Real-time prices and market insights</p>
+    <p class="subtitle">World indices, the top 100 cryptocurrencies and market news. Data is cached for up to 5 minutes.</p>
 </div>
 
 <div class="tabs-container">
     <div role="tablist" class="tabs">
         <button type="button" class="tab-btn" data-target="#panel-stocks" aria-selected="true" role="tab">
-            <span class="tab-icon">📈</span>
-            <span>Stocks</span>
+            <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>
+            <span>Global indices</span>
         </button>
         <button type="button" class="tab-btn" data-target="#panel-crypto" role="tab">
-            <span class="tab-icon">₿</span>
+            <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M9.5 7.5h3.8a2.1 2.1 0 0 1 0 4.2H9.5m0 0h4.3a2.4 2.4 0 0 1 0 4.8H9.5m0-9v9M11 6v1.5m0 9V18"/></svg>
             <span>Crypto</span>
+            <span class="tab-count">top 100</span>
         </button>
         <button type="button" class="tab-btn" data-target="#panel-top-stocks" role="tab">
-            <span class="tab-icon">📰</span>
-            <span>Top News</span>
+            <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h6M7 12.5h10M7 16h10"/></svg>
+            <span>Market news</span>
         </button>
     </div>
     <div class="search-wrapper">
@@ -246,58 +247,82 @@
     .tabs-container {
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        align-items: flex-end;
         gap: 1rem;
         margin-bottom: 2rem;
         flex-wrap: wrap;
+        border-bottom: 1px solid color-mix(in srgb, var(--pico-muted-color) 35%, transparent);
     }
 
+    /* Underline tabs: quiet labels, the selected one marked by an accent line. */
     .tabs {
         display: flex;
-        gap: 0.5rem;
-        background: var(--pico-card-background-color);
-        padding: 0.5rem;
-        border-radius: var(--pico-border-radius);
-        border: none;
+        gap: 1.75rem;
+        /* Pico redefines --pico-color inside buttons (white button text), so take the page's
+           text colour here, outside the buttons. */
+        --tab-fg: var(--pico-color);
+        margin-bottom: -1px;   /* the selected underline sits on the container's rule */
+        flex: 0 1 auto;
+        overflow-x: auto;
+        scrollbar-width: none;
     }
 
     .tab-btn {
         display: inline-flex;
         align-items: center;
         gap: 0.5rem;
-        padding: 0.75rem 1.25rem;
-        background: transparent;
-        border: 2px solid transparent;
-        border-radius: var(--pico-border-radius);
+        padding: 0.75rem 0.1rem;
+        margin: 0 0 -1px;
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        border-radius: 0;
+        box-shadow: none;
         cursor: pointer;
-        font-size: 0.95rem;
+        font-size: 1rem;
         font-weight: 500;
-        color: var(--pico-color);
-        transition: all 0.2s ease;
-        margin: 0;
+        white-space: nowrap;
+        color: var(--pico-muted-color);
+        transition: color 0.15s ease, border-color 0.15s ease;
     }
 
     .tab-btn:hover {
-        background: var(--pico-primary-hover-background);
-        color: var(--pico-primary-inverse);
-        transform: translateY(-2px);
+        color: var(--tab-fg);
+        border-bottom-color: color-mix(in srgb, var(--pico-muted-color) 60%, transparent);
+    }
+
+    .tab-btn:focus-visible {
+        outline: 2px solid var(--pico-primary);
+        outline-offset: 2px;
     }
 
     .tab-btn[aria-selected="true"] {
-        background: var(--pico-primary-background);
-        color: var(--pico-primary-inverse);
-        border-color: var(--pico-primary-background);
+        color: var(--tab-fg);
+        border-bottom-color: var(--pico-primary);
     }
 
     .tab-icon {
-        font-size: 1.2rem;
-        line-height: 1;
+        width: 1.15rem;
+        height: 1.15rem;
+        flex: none;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .tab-count {
+        font-size: 0.75rem;
+        font-weight: 400;
+        color: var(--pico-muted-color);
     }
 
     /* Search */
     .search-wrapper {
         flex: 0 1 300px;
         min-width: 200px;
+        margin-bottom: 0.5rem;
     }
 
     #table-search {
@@ -435,16 +460,32 @@
 
         .tabs {
             width: 100%;
-            justify-content: center;
+            gap: 1rem;
+        }
+
+        .tab-btn {
+            font-size: 0.95rem;
         }
 
         .search-wrapper {
             width: 100%;
+            flex: none;  /* the desktop 300px basis would become a 300px height in a column */
+            order: -1;   /* above the tabs, so the selected underline stays on the rule */
         }
 
-        .tab-btn {
-            flex: 1;
-            justify-content: center;
+        .search-wrapper:has(> .hidden) {
+            display: none;
+        }
+
+        .tab-count {
+            display: none;
+        }
+    }
+
+    /* Phones: drop the icons so all three labels fit without scrolling. */
+    @media (max-width: 420px) {
+        .tab-icon {
+            display: none;
         }
     }
 </style>
