@@ -183,7 +183,9 @@ def _within(articles: list[dict], days: int) -> list[dict]:
 
 
 def company_news(symbol: str, limit: int = 60) -> dict:
-    """Up to `limit` recent articles about one company from all providers, newest first.
+    """Up to `limit` recent headlines about one company from all providers, plus its SEC filings
+    in the same window, newest first. Filings don't count toward `limit`: for a busy stock the
+    newest 60 headlines can all be from today and would push every filing off the list.
 
     The list covers NEWS_WINDOWS_DAYS[0] days, widened to the next window only when a quiet stock
     has fewer than MIN_ARTICLES. The tone summary always covers the last TONE_WINDOW_DAYS, so
@@ -204,7 +206,9 @@ def company_news(symbol: str, limit: int = 60) -> dict:
         days = wider
         articles = _within(merge(_finnhub_company(symbol, wider) + yahoo_items + filings), days)
 
-    articles = add_sentiment(articles[:limit])
+    headlines = [a for a in articles if a["provider"] != "sec"][:limit]
+    filings_kept = [a for a in articles if a["provider"] == "sec"]
+    articles = add_sentiment(sorted(headlines + filings_kept, key=lambda a: a["published_at"], reverse=True))
     logger.info("company_news symbol=%s articles=%d window_days=%d", symbol, len(articles), days)
     return {"symbol": symbol, "articles": articles, "window_days": days,
             "tone": tone_summary(articles, days=TONE_WINDOW_DAYS),

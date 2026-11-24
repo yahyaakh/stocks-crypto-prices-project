@@ -84,7 +84,7 @@ Full results, confusion matrices and live examples: [`docs/SENTIMENT_EVAL.md`](d
 - Engine: 24/24 test cases, including a differential test that runs 200,000 random operations against
   a slow, obviously correct reference book and stops at the first divergence. CI also runs them under
   AddressSanitizer + UndefinedBehaviorSanitizer.
-- Dashboard: 107 pytest tests (`pytest`, 3.4 s on the laptop above). Providers are mocked, so they run in
+- Dashboard: 108 pytest tests (`pytest`, 3.2 s on the laptop above). Providers are mocked, so they run in
   CI without API keys; they also all pass with every HTTP(S) request forced through a dead proxy.
 
 ---

@@ -1,5 +1,5 @@
 """SEC 8-K filings in the company news feed. No network: SEC responses are mocked."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 import pytest
@@ -96,6 +96,22 @@ def test_company_news_includes_filings_without_tone(monkeypatch):
     assert by_provider["yahoo"]["sentiment"] is not None
     assert out["tone"]["total"] == 1                                       # the filing is not in the tone
     assert "SEC EDGAR" in out["sources"]
+
+
+def test_filings_survive_a_full_headline_list(monkeypatch):
+    """A busy stock fills the headline limit with today's news; older filings in the window stay."""
+    now = datetime.now(timezone.utc)
+    headlines = [news._article(f"Microsoft story {i}", "", f"https://example.com/{i}", "Reuters", "finnhub",
+                               now - timedelta(minutes=i), ["MSFT"], None) for i in range(80)]
+    filing = news._article("MSFT files 8-K: Results of operations (earnings)", "", "https://www.sec.gov/y",
+                           "SEC EDGAR", "sec", now - timedelta(days=20), ["MSFT"], None)
+    filing["form"] = "8-K"
+    monkeypatch.setattr(news, "_finnhub_company", lambda s, d: list(headlines))
+    monkeypatch.setattr(news, "_yahoo", lambda s, c=10: [])
+    monkeypatch.setattr(news.sec, "company_filings", lambda s, d: [filing])
+    out = news.company_news("MSFT", limit=60)
+    providers = [a["provider"] for a in out["articles"]]
+    assert providers.count("finnhub") == 60 and providers[-1] == "sec"   # newest first, filing last
 
 
 def test_news_page_labels_filings(client, monkeypatch):
