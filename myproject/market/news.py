@@ -3,6 +3,8 @@
 Providers:
 - Finnhub (free key): company news, and general market news. Links go through finnhub.io redirects.
 - Yahoo Finance via yfinance: no key; links point at Yahoo or the original publisher.
+- SEC EDGAR (company feeds only, needs SEC_USER_AGENT): the company's own Form 8-K filings, shown
+  as "SEC filing" items. They are not scored for tone and do not count in the tone summary.
 
 Every article becomes the same dict:
     {id, headline, summary, url, source, provider, published_at (ISO-8601 UTC), tickers, image, sentiment}
@@ -19,6 +21,7 @@ import finnhub
 import yfinance as yf
 from django.conf import settings
 
+from . import sec
 from .sentiment import get_model, model_card
 
 logger = logging.getLogger(__name__)
@@ -91,7 +94,8 @@ def merge(articles: list[dict]) -> list[dict]:
     direct publisher link (Finnhub's are redirects) and the longer summary; union their tickers."""
     best: dict[str, dict] = {}
     for a in articles:
-        key = _headline_key(a["headline"])
+        # Two filings can share a headline ("files 8-K: Director or officer change"); never merge them.
+        key = a["url"] if a["provider"] == "sec" else _headline_key(a["headline"])
         cur = best.get(key)
         if cur is None:
             best[key] = a
@@ -104,11 +108,13 @@ def merge(articles: list[dict]) -> list[dict]:
 
 
 def add_sentiment(articles: list[dict]) -> list[dict]:
-    """Score headlines only: the models were evaluated on single sentences, not article summaries."""
+    """Score headlines only: the models were evaluated on single sentences, not article summaries.
+    SEC filings are skipped: "files 8-K: Results of operations" is a label, not a news sentence."""
     model = get_model()
-    if model is None or not articles:
+    news = [a for a in articles if a["provider"] != "sec"]
+    if model is None or not news:
         return articles
-    for a, s in zip(articles, model.score_many([a["headline"] for a in articles])):
+    for a, s in zip(news, model.score_many([a["headline"] for a in news])):
         a["sentiment"] = s.as_dict()
     return articles
 
@@ -183,18 +189,20 @@ def company_news(symbol: str, limit: int = 60) -> dict:
     has fewer than MIN_ARTICLES. The tone summary always covers the last TONE_WINDOW_DAYS, so
     "recent mood" means the same thing for every stock however long the list is."""
     symbol = symbol.upper()
-    with ThreadPoolExecutor(max_workers=2) as pool:
+    with ThreadPoolExecutor(max_workers=3) as pool:
         fin = pool.submit(_finnhub_company, symbol, NEWS_WINDOWS_DAYS[0])
         yah = pool.submit(_yahoo, symbol, YAHOO_COMPANY_COUNT)
-        finnhub_items, yahoo_items = fin.result(), yah.result()
+        # Fetched once for the widest window; _within() trims it with everything else.
+        fil = pool.submit(sec.company_filings, symbol, NEWS_WINDOWS_DAYS[-1])
+        finnhub_items, yahoo_items, filings = fin.result(), yah.result(), fil.result()
 
     days = NEWS_WINDOWS_DAYS[0]
-    articles = _within(merge(finnhub_items + yahoo_items), days)
+    articles = _within(merge(finnhub_items + yahoo_items + filings), days)
     for wider in NEWS_WINDOWS_DAYS[1:]:
         if len(articles) >= MIN_ARTICLES:
             break
         days = wider
-        articles = _within(merge(_finnhub_company(symbol, wider) + yahoo_items), days)
+        articles = _within(merge(_finnhub_company(symbol, wider) + yahoo_items + filings), days)
 
     articles = add_sentiment(articles[:limit])
     logger.info("company_news symbol=%s articles=%d window_days=%d", symbol, len(articles), days)

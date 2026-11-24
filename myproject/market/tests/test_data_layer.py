@@ -85,6 +85,31 @@ def test_analyst_ratings_newest_first_mapped_and_windowed(monkeypatch):
     assert rows[0]["previous_grade"] == "Hold" and rows[1]["new_grade"] == "Buy"
 
 
+def test_analyst_ratings_carry_price_target_changes(monkeypatch):
+    """Yahoo's price-target columns come through; its 0 means 'no target' and becomes None."""
+    df = pd.DataFrame(
+        {"Firm": ["Jefferies", "UBS", "Old Co", "New Co"], "ToGrade": ["Hold", "Buy", "Buy", "Buy"],
+         "FromGrade": ["Hold", "Buy", "Buy", ""], "Action": ["main", "main", "main", "init"],
+         "priceTargetAction": ["Raises", "Maintains", "", "Announces"],
+         "currentPriceTarget": [175.0, 180.0, 0.0, 150.0], "priorPriceTarget": [145.0, 180.0, 0.0, 0.0]},
+        index=pd.DatetimeIndex(["2026-11-09", "2026-11-08", "2026-11-07", "2026-11-06"], name="GradeDate"),
+    )
+    monkeypatch.setattr(stocksOverview.yf, "Ticker", lambda s: mock.Mock(upgrades_downgrades=df))
+    rows = stocksOverview.get_analyst_ratings("DUOL", today=date(2026, 11, 24))
+    got = [(r["firm"], r["price_target_action"], r["prior_price_target"], r["price_target"]) for r in rows]
+    assert got == [("Jefferies", "raise", 145.0, 175.0), ("UBS", "maintain", 180.0, 180.0),
+                   ("Old Co", None, None, None), ("New Co", "new", None, 150.0)]
+
+
+def test_analyst_ratings_without_target_columns(monkeypatch):
+    """Older yfinance versions have no price-target columns: the fields are just None."""
+    df = pd.DataFrame({"Firm": ["RBC"], "ToGrade": ["Buy"], "FromGrade": ["Hold"], "Action": ["up"]},
+                      index=pd.DatetimeIndex(["2026-11-20"], name="GradeDate"))
+    monkeypatch.setattr(stocksOverview.yf, "Ticker", lambda s: mock.Mock(upgrades_downgrades=df))
+    (row,) = stocksOverview.get_analyst_ratings("MSFT", today=date(2026, 11, 21))
+    assert (row["price_target"], row["prior_price_target"], row["price_target_action"]) == (None, None, None)
+
+
 # ---------- price history ----------
 
 def test_history_rejects_unknown_period():

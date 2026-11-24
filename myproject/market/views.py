@@ -1,10 +1,12 @@
 import logging
 import math
 import re
+from urllib.parse import urlencode
 
 import yfinance as yf
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.cache import cache_control, cache_page, never_cache
 from django.views.decorators.http import require_GET
 
@@ -14,6 +16,7 @@ from .stocks.stock_prices import (
     get_biggest_etf_stock_prices,
     get_magnificent7_prices,
 )
+from . import symbols
 from .news import company_news, market_news
 from .stocks.stocks_home_page import get_world_indices_tables
 from .stocks.stocksOverview import (
@@ -109,7 +112,10 @@ POPULAR_SYMBOLS = [("AAPL", "Apple"), ("MSFT", "Microsoft"), ("NVDA", "NVIDIA"),
 
 @cached(PAGE_TTL_S)
 def stocks_page(request):
-    return render(request, "stocks.html", {"popular": POPULAR_SYMBOLS})
+    # ?q= is set by stock_lookup when what was typed is not an exact US symbol.
+    query = (request.GET.get("q") or "").strip()[:60]
+    suggestions = symbols.search(query) if query else []
+    return render(request, "stocks.html", {"popular": POPULAR_SYMBOLS, "query": query, "suggestions": suggestions})
 
 
 def _symbol(request, default: str = "MSFT") -> str:
@@ -118,16 +124,41 @@ def _symbol(request, default: str = "MSFT") -> str:
 
 # Tickers look like AAPL, BRK-B, BRK.B, ^GSPC, EURUSD=X. Anything else is not a symbol.
 _SYMBOL_RE = re.compile(r"^[A-Z0-9^][A-Z0-9.\-=^]{0,14}$")
+# Symbols Yahoo knows that the US listing directory never will: indices (^GSPC), currencies and
+# futures (EURUSD=X, GC=F), crypto pairs (BTC-USD) and foreign listings (7203.T, VOD.L).
+_YAHOO_ONLY_RE = re.compile(r"[\^=]|-USD$|\.[A-Z]{1,3}$")
 
 
 def stock_lookup(request, symbol: str = ""):
     """One stock page: the React overview. The header search (?symbol=), /stock/AAPL and the
     retired /info/ and /target/ pages all land here and redirect to /live/stock/<SYMBOL>.
-    Not permanent (302): the retired URLs may be reused later without stale browser redirects."""
-    s = (symbol or request.GET.get("symbol") or "").strip().upper()
+    Not permanent (302): the retired URLs may be reused later without stale browser redirects.
+
+    With Nasdaq's symbol directory loaded, a US symbol must exist: "BRK.B" goes to BRK-B, and
+    anything else (a typo, a company name) goes to the Research page with suggestions instead of
+    an empty overview. Without the directory (Nasdaq unreachable) any well-formed symbol goes through."""
+    raw = (symbol or request.GET.get("symbol") or "").strip()[:60]
+    s = raw.upper()
+    if not s:
+        return redirect("stocks")
+    if symbols.available():
+        listing = symbols.get(s)
+        if listing:
+            return redirect(f"/live/stock/{listing['symbol']}")
+        if _SYMBOL_RE.match(s) and _YAHOO_ONLY_RE.search(s):
+            return redirect(f"/live/stock/{s}")
+        return redirect(reverse("stocks") + "?" + urlencode({"q": raw}))
     if not _SYMBOL_RE.match(s):
         return redirect("stocks")
     return redirect(f"/live/stock/{s}")
+
+
+@cache_control(public=True, max_age=3600)
+@require_GET
+def api_symbols(request):
+    """Header-search suggestions: ?q=app -> up to 8 US-listed stocks and ETFs."""
+    query = (request.GET.get("q") or "").strip()[:60]
+    return JsonResponse({"query": query, "results": symbols.search(query), "source": "Nasdaq Trader symbol directory"})
 
 
 @cached(PAGE_TTL_S)

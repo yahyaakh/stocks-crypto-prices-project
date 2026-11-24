@@ -3,6 +3,7 @@ import os
 
 os.environ.setdefault("SECRET_KEY", "test-only-not-secret")
 os.environ["FINNHUB_API_KEY"] = ""
+os.environ["SEC_USER_AGENT"] = ""
 
 from .settings import *  # noqa: E402,F401,F403
 

@@ -88,11 +88,22 @@ def get_stock_overview(symbol: str) -> dict:
 
 # Yahoo's short action codes -> readable words for the frontend.
 YF_ACTIONS = {"up": "upgrade", "down": "downgrade", "main": "maintain", "init": "initiate", "reit": "reiterate"}
+# Yahoo's price-target actions. "Announces" is a firm's first target (no prior one).
+YF_TARGET_ACTIONS = {"Raises": "raise", "Lowers": "lower", "Maintains": "maintain", "Announces": "new", "Adjusts": "adjust"}
+
+
+def _target(value) -> float | None:
+    """Yahoo writes 0 when a row has no price target (or no prior one): treat 0 and NaN as missing."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    return v if v > 0 and v == v else None
 
 
 def get_analyst_ratings(symbol: str, lookback_days: int = 365, today: date | None = None) -> list[dict]:
     """Analyst grade changes from yfinance over the last `lookback_days` (rolling window, not a
-    hard-coded year), newest first."""
+    hard-coded year), newest first, with the firm's price-target change when Yahoo has one."""
     symbol = symbol.upper()
     # ISO dates (YYYY-MM-DD) compare correctly as strings.
     cutoff = ((today or date.today()) - timedelta(days=lookback_days)).isoformat()
@@ -109,12 +120,16 @@ def get_analyst_ratings(symbol: str, lookback_days: int = 365, today: date | Non
         if day < cutoff:
             break  # sorted newest first: everything after this is older
         action = row.get("Action")
+        target = _target(row.get("currentPriceTarget"))
         out.append({
             "firm": row.get("Firm") or None,
             "date": day,
             "previous_grade": row.get("FromGrade") or None,
             "new_grade": row.get("ToGrade") or None,
             "action": YF_ACTIONS.get(action, action or None),
+            "price_target": target,
+            "prior_price_target": _target(row.get("priorPriceTarget")) if target else None,
+            "price_target_action": YF_TARGET_ACTIONS.get(row.get("priceTargetAction")) if target else None,
         })
     return out
 

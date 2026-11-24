@@ -38,7 +38,8 @@
         <article class="news-card" data-source="{{ a.source }}" data-tone="{{ a.sentiment.label|default:'' }}">
             <div class="meta">
                 <span><span class="source">{{ a.source }}</span> · <time datetime="{{ a.published_at }}">{{ a.published_at|slice:":10" }}</time></span>
-                {% if a.sentiment %}<span class="tone-chip bg-{{ a.sentiment.label }} {{ a.sentiment.label }}">{{ a.sentiment.label }}</span>{% endif %}
+                {% if a.provider == "sec" %}<span class="filing-chip" title="The company's own filing with the SEC; not scored for tone">SEC {{ a.form }}</span>
+                {% elif a.sentiment %}<span class="tone-chip bg-{{ a.sentiment.label }} {{ a.sentiment.label }}">{{ a.sentiment.label }}</span>{% endif %}
             </div>
             <h3><a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.headline }}</a></h3>
             {% if a.summary %}<p class="news-summary">{{ a.summary }}</p>{% endif %}

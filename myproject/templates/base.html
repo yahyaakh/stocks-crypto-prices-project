@@ -17,6 +17,19 @@
         .brand { color: inherit; text-decoration: none; }
         .nav-search { margin: 0; }
         .nav-search input { margin: 0; height: 2.4rem; padding: .3rem .8rem; width: 11rem; font-size: .9rem; }
+        /* Symbol suggestions under a search box (divs, not ul/li: Pico styles every list inside nav). */
+        .has-suggest { position: relative; }
+        .symbol-suggest { position: absolute; top: 100%; left: 0; z-index: 50; width: max(100%, 22rem); max-width: 92vw;
+                          margin-top: .25rem; padding: .25rem; background: var(--pico-card-background-color);
+                          border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius);
+                          box-shadow: var(--pico-card-box-shadow); }
+        .nav-search .symbol-suggest { left: auto; right: 0; }
+        .symbol-suggest [role="option"] { display: flex; gap: .6rem; align-items: baseline; padding: .4rem .6rem;
+                                          border-radius: calc(var(--pico-border-radius) / 2); cursor: pointer; font-size: .9rem; }
+        .symbol-suggest [role="option"][aria-selected="true"], .symbol-suggest [role="option"]:hover { background: var(--pico-primary-focus); }
+        .symbol-suggest .sym { font-weight: 700; min-width: 4.2rem; }
+        .symbol-suggest .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .symbol-suggest .exch { color: var(--pico-muted-color); font-size: .75rem; white-space: nowrap; }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
@@ -36,8 +49,8 @@
             <li>
                 {# Enter submits; the server redirects to /live/stock/<SYMBOL>, so it works without JS. #}
                 <form action="{% url 'stock_lookup' %}" method="get" class="nav-search">
-                    <input type="search" name="symbol" placeholder="Symbol, e.g. AAPL" aria-label="Look up a stock by symbol"
-                           autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+                    <input type="search" name="symbol" placeholder="Symbol or company" aria-label="Look up a stock by symbol or company name"
+                           autocomplete="off" spellcheck="false" required data-symbol-suggest>
                 </form>
             </li>
         </ul>
@@ -48,6 +61,87 @@
     {% block content %}{% endblock %}
 </main>
 
+<script>
+// Suggestions for every search box marked data-symbol-suggest (US stocks and ETFs from /api/symbols/).
+// Without JS the form still works: the server checks the symbol and redirects.
+(function () {
+    document.querySelectorAll('input[data-symbol-suggest]').forEach(function (input, n) {
+        const form = input.form;
+        const box = document.createElement('div');
+        box.id = 'symbol-suggest-' + n;
+        box.className = 'symbol-suggest';
+        box.setAttribute('role', 'listbox');
+        box.hidden = true;
+        form.classList.add('has-suggest');
+        input.after(box);   // right after the input: Pico rounds the first and last child of a search group
+        input.setAttribute('role', 'combobox');
+        input.setAttribute('aria-autocomplete', 'list');
+        input.setAttribute('aria-controls', box.id);
+        input.setAttribute('aria-expanded', 'false');
+
+        let items = [], active = -1, timer = null, ctrl = null;
+        const go = sym => { location.href = '/live/stock/' + encodeURIComponent(sym); };
+
+        function close() {
+            box.hidden = true;
+            input.setAttribute('aria-expanded', 'false');
+            input.removeAttribute('aria-activedescendant');
+            active = -1;
+        }
+        function highlight(i) {
+            active = i;
+            [...box.children].forEach((el, j) => el.setAttribute('aria-selected', String(j === i)));
+            if (i >= 0) input.setAttribute('aria-activedescendant', box.children[i].id);
+        }
+        function render(results) {
+            items = results;
+            box.replaceChildren();
+            if (!results.length) { close(); return; }
+            results.forEach(function (r, i) {
+                const opt = document.createElement('div');
+                opt.id = box.id + '-' + i;
+                opt.setAttribute('role', 'option');
+                opt.setAttribute('aria-selected', 'false');
+                [['sym', r.symbol], ['name', r.name], ['exch', r.exchange + (r.etf ? ' · ETF' : '')]].forEach(function ([cls, text]) {
+                    const s = document.createElement('span');
+                    s.className = cls;
+                    s.textContent = text;   // textContent: names come from a third-party file
+                    opt.appendChild(s);
+                });
+                opt.addEventListener('mousedown', e => { e.preventDefault(); go(r.symbol); });
+                box.appendChild(opt);
+            });
+            active = -1;
+            box.hidden = false;
+            input.setAttribute('aria-expanded', 'true');
+        }
+
+        input.addEventListener('input', function () {
+            clearTimeout(timer);
+            const q = input.value.trim();
+            if (!q) { render([]); return; }
+            timer = setTimeout(async function () {
+                if (ctrl) ctrl.abort();
+                ctrl = new AbortController();
+                try {
+                    const resp = await fetch('/api/symbols/?q=' + encodeURIComponent(q), {signal: ctrl.signal});
+                    if (!resp.ok) return;
+                    const data = await resp.json();
+                    if (input.value.trim() === q) render(data.results || []);
+                } catch (e) { /* aborted or offline: keep the plain form */ }
+            }, 150);
+        });
+        input.addEventListener('keydown', function (e) {
+            if (box.hidden) return;
+            if (e.key === 'ArrowDown') { e.preventDefault(); highlight((active + 1) % items.length); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(active <= 0 ? items.length - 1 : active - 1); }
+            else if (e.key === 'Enter' && active >= 0) { e.preventDefault(); go(items[active].symbol); }
+            else if (e.key === 'Escape') { e.preventDefault(); close(); }   // a search box clears itself on Escape otherwise
+        });
+        input.addEventListener('blur', () => setTimeout(close, 120));
+    });
+})();
+</script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>

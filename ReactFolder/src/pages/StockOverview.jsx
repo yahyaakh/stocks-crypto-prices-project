@@ -47,6 +47,24 @@ function ago(iso) {
   return `${Math.round(mins / 1440)}d ago`
 }
 
+// A firm's price-target change from Yahoo: "$145 → $175" (raise/lower), "$175 kept", "$175 new".
+const usd = v => "$" + v.toLocaleString("en-US", { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 })
+
+function TargetChange({ r }) {
+  if (r.price_target == null) return <span style={{ color: "#6b7280" }}>—</span>
+  const prior = r.prior_price_target
+  const moved = prior != null && prior !== r.price_target
+  const color = !moved ? "#e5e7eb" : r.price_target > prior ? "#22c55e" : "#ef4444"
+  // Colour and arrow come from the two numbers, not from Yahoo's action word.
+  const note = moved ? null : prior != null ? "kept" : r.price_target_action === "new" ? "new" : null
+  return (
+    <span style={{ color, whiteSpace: "nowrap" }}>
+      {moved ? `${usd(prior)} → ${usd(r.price_target)}` : usd(r.price_target)}
+      {note && <span style={{ color: "#9ca3af", fontSize: "12px", marginLeft: "6px" }}>{note}</span>}
+    </span>
+  )
+}
+
 function ToneChip({ label: tone }) {
   if (!tone) return null
   return (
@@ -306,7 +324,9 @@ export default function StockOverview() {
           <ul className="mt-3" style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {news.articles.slice(0, 5).map(a => (
               <li key={a.id} style={{ padding: "8px 0", borderTop: "1px solid #1f2937", display: "flex", gap: "10px", alignItems: "center" }}>
-                <ToneChip label={a.sentiment?.label} />
+                {a.provider === "sec"
+                  ? <span title="The company's own filing with the SEC; not scored for tone" style={{ padding: "1px 8px", borderRadius: "999px", fontSize: "11px", fontWeight: 700, border: "1px solid #4b5563", color: "#9ca3af", whiteSpace: "nowrap" }}>SEC {a.form}</span>
+                  : <ToneChip label={a.sentiment?.label} />}
                 <a href={safeHref(a.url)} target="_blank" rel="noopener noreferrer" style={{ color: "#e5e7eb", flex: 1 }}>{a.headline}</a>
                 <span style={{ color: "#9ca3af", fontSize: "12px", whiteSpace: "nowrap" }}>{a.source} · {ago(a.published_at)}</span>
               </li>
@@ -358,6 +378,7 @@ export default function StockOverview() {
                 <TableHeaderCell>Grade</TableHeaderCell>
                 <TableHeaderCell>Action</TableHeaderCell>
                 <TableHeaderCell>Previous Grade</TableHeaderCell>
+                <TableHeaderCell>Price Target</TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -368,10 +389,16 @@ export default function StockOverview() {
                   <TableCell>{r.new_grade ?? "—"}</TableCell>
                   <TableCell><Badge color={ACTION_COLORS[r.action] ?? "gray"}>{label(r.action)}</Badge></TableCell>
                   <TableCell>{r.previous_grade ?? "—"}</TableCell>
+                  <TableCell><TargetChange r={r} /></TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+        )}
+        {ratings.length > 0 && (
+          <Text className="mt-2" style={{ fontSize: "12px" }}>
+            Source: Yahoo Finance. Its broker coverage is incomplete, so some firms' changes are missing.
+          </Text>
         )}
       </Card>
 

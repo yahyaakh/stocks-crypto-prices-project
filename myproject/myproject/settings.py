@@ -30,6 +30,9 @@ if not SECRET_KEY:
 # Third-party API key. Optional: features that need it (news, IPOs, monthly analyst trend)
 # degrade to empty results or Yahoo data without it.
 FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "")
+# SEC EDGAR needs no key, but its fair-access policy requires a User-Agent naming you and a contact
+# email, e.g. "Jane Doe jane@example.com". Without it the 8-K filings are left out of company news.
+SEC_USER_AGENT = os.environ.get("SEC_USER_AGENT", "").strip()
 
 # News-tone model: "lexicon" (default, tiny) or "finbert" (needs requirements-finbert.txt; +2.3 GB image).
 SENTIMENT_MODEL = os.environ.get("SENTIMENT_MODEL", "lexicon")

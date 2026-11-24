@@ -120,9 +120,14 @@ def test_browser_cache_is_short_even_when_server_cache_is_long(client, monkeypat
     ("/stock/%5EGSPC/", "/live/stock/%5EGSPC"),          # Django percent-encodes ^; React Router decodes it
     ("/info/?symbol=nvda", "/live/stock/NVDA"),           # retired pages keep working
     ("/target/?symbol=MSFT", "/live/stock/MSFT"),
-    ("/stock/?symbol=", "/stocks/"),                      # not a symbol: back to Research
-    ("/stock/?symbol=%3Cscript%3E", "/stocks/"),
+    ("/stock/?symbol=", "/stocks/"),                      # nothing typed: back to Research
     ("/info/", "/stocks/"),
+    ("/stock/?symbol=brk.b", "/live/stock/BRK-B"),        # Nasdaq's form, sent on in Yahoo's form
+    ("/stock/?symbol=btc-usd", "/live/stock/BTC-USD"),    # Yahoo-only symbols skip the US directory
+    ("/stock/?symbol=7203.T", "/live/stock/7203.T"),
+    ("/stock/?symbol=apple", "/stocks/?q=apple"),         # not a symbol: Research with suggestions
+    ("/stock/?symbol=AAPLL", "/stocks/?q=AAPLL"),         # a typo no longer opens an empty overview
+    ("/stock/?symbol=%3Cscript%3E", "/stocks/?q=%3Cscript%3E"),
 ])
 def test_stock_lookup_redirects(client, path, target):
     r = client.get(path)
@@ -133,3 +138,28 @@ def test_research_page_links_to_overview_and_not_retired_pages(client):
     html = client.get("/stocks/").content.decode()
     assert 'href="/live/stock/AAPL"' in html and 'action="/stock/"' in html
     assert "/info/" not in html and "/target/" not in html
+
+
+def test_lookup_without_the_directory_accepts_any_well_formed_symbol(client, monkeypatch):
+    """Nasdaq unreachable: fall back to the old rule instead of rejecting every symbol."""
+    from market.tests.conftest import load_listings
+    load_listings(monkeypatch, [])
+    monkeypatch.setattr("market.symbols._failed_at", 1e18)   # inside the retry wait: no download
+    assert client.get("/stock/?symbol=AAPLL")["Location"] == "/live/stock/AAPLL"
+    assert client.get("/stock/?symbol=%3Cscript%3E")["Location"] == "/stocks/"
+
+
+def test_research_page_suggests_matches_and_escapes_the_query(client):
+    html = client.get("/stocks/?q=apple").content.decode()
+    assert "Did you mean" in html
+    assert html.index('href="/live/stock/AAPL"') < html.index('href="/live/stock/APLE"')
+    html = client.get("/stocks/?q=%3Cscript%3E").content.decode()
+    assert "<strong>&lt;script&gt;</strong>" in html and "<strong><script>" not in html
+    assert "No US-listed stock or ETF matches" in html
+
+
+def test_symbols_api(client):
+    r = client.get("/api/symbols/?q=micro")
+    assert r.status_code == 200 and "max-age=3600" in r["Cache-Control"]
+    assert [x["symbol"] for x in r.json()["results"]] == ["MSFT", "MLGO"]
+    assert client.get("/api/symbols/?q=").json()["results"] == []

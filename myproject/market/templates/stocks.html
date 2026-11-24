@@ -12,9 +12,24 @@
     <section class="lookup-card">
         <h2>Look up a stock</h2>
         <p>Price chart, key statistics, analyst targets and rating changes, and headline tone, all on one page.</p>
+        {% if query %}
+        <div class="lookup-miss" role="status">
+            {% if suggestions %}
+            <p>No US-listed symbol is exactly <strong>{{ query }}</strong>. Did you mean:</p>
+            <ul>
+                {% for r in suggestions %}
+                <li><a href="/live/stock/{{ r.symbol|urlencode }}"><strong>{{ r.symbol }}</strong> {{ r.name }}</a>
+                    <small>{{ r.exchange }}{% if r.etf %} · ETF{% endif %}</small></li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p>No US-listed stock or ETF matches <strong>{{ query }}</strong>. Check the symbol, or search by company name.</p>
+            {% endif %}
+        </div>
+        {% endif %}
         <form action="{% url 'stock_lookup' %}" method="get" role="search">
-            <input type="search" name="symbol" placeholder="Symbol, e.g. MSFT" aria-label="Stock symbol"
-                   autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+            <input type="search" name="symbol" placeholder="Symbol or company, e.g. MSFT or Microsoft" aria-label="Stock symbol or company name"
+                   autocomplete="off" spellcheck="false" required data-symbol-suggest>
             <button type="submit">Open overview</button>
         </form>
         <div class="quick-links">
@@ -81,6 +96,11 @@
     }
     .lookup-card h2 { margin: 0 0 .5rem; font-size: 1.4rem; }
     .lookup-card p { color: var(--pico-muted-color); margin-bottom: 1rem; }
+    .lookup-miss { border-left: 3px solid var(--pico-primary); border-radius: 0; padding: .25rem 0 .25rem 1rem; margin-bottom: 1rem; }
+    .lookup-miss p { color: var(--pico-color); margin-bottom: .5rem; }
+    .lookup-miss ul { margin: 0; padding-left: 0; list-style: none; }
+    .lookup-miss li { list-style: none; margin: .2rem 0; }
+    .lookup-miss small { color: var(--pico-muted-color); margin-left: .4rem; }
     .lookup-card form { max-width: 560px; margin-bottom: 1rem; }
 
     .tools-grid {

@@ -26,6 +26,7 @@ urlpatterns = [
     path("api/crypto/", views.api_crypto, name="api_crypto"),
     path("api/news/", views.api_news, name="api_news"),
     path("api/get-price/", views.api_get_stock_price, name="api_get_price"),
+    path("api/symbols/", views.api_symbols, name="api_symbols"),
     path("api/stocks/<str:symbol>/overview/", views.stock_overview_api, name="stock_overview_api"),
     path("api/stocks/<str:symbol>/ratings/", views.analyst_ratings_api, name="analyst_ratings_api"),
     path("api/stocks/<str:symbol>/history/", views.stock_price_history_api, name="stock_history_api"),
