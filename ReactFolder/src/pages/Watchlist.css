@@ -1,19 +1,22 @@
 /* Watchlist page. Everything is scoped under .wl and written specifically enough to win over
    Pico's element styles, which the Django page around the React root loads first. */
+/* Colours come from the site's Pico theme, so the page matches the header and the other pages. */
 .wl {
-  --wl-card: #1f2937;
-  --wl-border: #374151;
-  --wl-muted: #9ca3af;
-  --wl-text: #e5e7eb;
+  --wl-card: var(--pico-card-background-color, #181c25);
+  --wl-field: var(--pico-form-element-background-color, #1c212c);
+  --wl-border: var(--pico-form-element-border-color, #2a3140);
+  --wl-muted: var(--pico-muted-color, #7b8495);
+  --wl-text: var(--pico-color, #c2c7d0);
   --wl-up: #22c55e;
   --wl-down: #ef4444;
-  --wl-accent: #0ea5b7;
+  --wl-accent: var(--pico-primary-background, #0172ad);
+  --wl-accent-hover: var(--pico-primary-hover-background, #015887);
   max-width: 1100px;
   margin: 0 auto;
   padding: 1.5rem 0 2rem;
 }
 
-.wl .wl-head h1 { margin: 0 0 .35rem; font-size: 2rem; font-weight: 700; line-height: 1.2; color: #fff; }
+.wl .wl-head h1 { margin: 0 0 .35rem; font-size: 2rem; font-weight: 700; line-height: 1.2; color: var(--pico-h1-color, #f0f1f3); }
 .wl .wl-sub { margin: 0 0 1.25rem; color: var(--wl-muted); max-width: 46rem; }
 
 /* Add form: input and button in one row, wrapping on narrow screens */
@@ -21,14 +24,17 @@
 .wl .wl-input-wrap { position: relative; flex: 1 1 260px; min-width: 0; }
 .wl input.wl-input {
   width: 100%; margin: 0; height: 2.75rem; padding: 0 .9rem;
-  background: var(--wl-card); color: var(--wl-text); border: 1px solid var(--wl-border); border-radius: 8px;
+  background: var(--wl-field); color: var(--wl-text); border: 1px solid var(--wl-border); border-radius: 8px;
 }
-.wl input.wl-input:focus { border-color: var(--wl-accent); box-shadow: 0 0 0 3px rgba(14, 165, 183, .25); outline: none; }
+.wl input.wl-input:focus {
+  border-color: var(--pico-primary-border, var(--wl-accent));
+  box-shadow: 0 0 0 3px var(--pico-primary-focus, rgba(1, 170, 255, .25)); outline: none;
+}
 .wl button.wl-add {
   width: auto; margin: 0; height: 2.75rem; padding: 0 1.4rem; border-radius: 8px; border: none;
   background: var(--wl-accent); color: #fff; font-weight: 600; cursor: pointer;
 }
-.wl button.wl-add:hover:not(:disabled) { background: #12b8cb; }
+.wl button.wl-add:hover:not(:disabled) { background: var(--wl-accent-hover); }
 .wl button.wl-add:disabled { opacity: .6; cursor: progress; }
 
 /* Suggestions */
@@ -42,7 +48,7 @@
   display: flex; gap: .6rem; align-items: baseline; padding: .45rem .7rem; cursor: pointer; color: var(--wl-text);
 }
 .wl .wl-suggest [role="option"][aria-selected="true"],
-.wl .wl-suggest [role="option"]:hover { background: rgba(14, 165, 183, .18); }
+.wl .wl-suggest [role="option"]:hover { background: var(--pico-primary-focus, rgba(1, 170, 255, .2)); }
 .wl .wl-suggest .sym { font-weight: 700; min-width: 4.2rem; }
 .wl .wl-suggest .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wl .wl-suggest .exch { color: var(--wl-muted); font-size: .75rem; white-space: nowrap; }
@@ -59,7 +65,7 @@
   width: auto; margin: 0; padding: .35rem .8rem; border-radius: 999px; font-size: .9rem; cursor: pointer;
   background: transparent; color: var(--wl-text); border: 1px solid var(--wl-border);
 }
-.wl .wl-starters button:hover:not(:disabled) { border-color: var(--wl-accent); color: #fff; }
+.wl .wl-starters button:hover:not(:disabled) { border-color: var(--pico-primary, #01aaff); color: #fff; }
 
 /* Bar above the cards */
 .wl .wl-bar {
@@ -79,10 +85,10 @@
   background: var(--wl-card); border: 1px solid var(--wl-border); box-shadow: none; color: var(--wl-text);
   transition: border-color .15s;
 }
-.wl .wl-card:hover { border-color: #4b5563; }
+.wl .wl-card:hover { border-color: var(--wl-muted); }
 .wl .wl-card-top { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
 .wl a.wl-symbol { font-size: 1.15rem; font-weight: 700; color: #fff; text-decoration: none; }
-.wl a.wl-symbol:hover { color: var(--wl-accent); text-decoration: underline; }
+.wl a.wl-symbol:hover { color: var(--pico-primary, #01aaff); text-decoration: underline; }
 .wl button.wl-remove {
   width: 1.75rem; height: 1.75rem; margin: 0; padding: 0; line-height: 1; font-size: 1.2rem;
   border-radius: 6px; border: none; background: transparent; color: var(--wl-muted); cursor: pointer; flex: none;
@@ -99,7 +105,7 @@
 .wl .wl-change { font-size: .9rem; color: var(--wl-muted); font-variant-numeric: tabular-nums; }
 .wl .wl-change.up { color: var(--wl-up); }
 .wl .wl-change.down { color: var(--wl-down); }
-.wl .wl-note { color: #6b7280; font-size: .8rem; margin: 1rem 0 0; }
+.wl .wl-note { color: var(--wl-muted); font-size: .8rem; margin: 1rem 0 0; }
 
 @keyframes wl-flash { from { opacity: .45; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .wl .wl-price { animation: none; } }

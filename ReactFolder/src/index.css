@@ -3,10 +3,8 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  background-color: #111827;
-  color: white;
-}
+/* No body background here: the Django page around the React root (Pico) paints the whole page,
+   so the watchlist and overview share one background with the header and every other page. */
 
 /* Optimized for integration with Django */
 
