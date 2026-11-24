@@ -4,7 +4,6 @@ A stock and crypto dashboard (Django + React, deployed on Azure Container Apps) 
 limit order book that reconstructs a real Nasdaq trading day exactly.
 
 **Live:** https://marketwatch.yahyaakh.dev
-(scales to zero, so the first request after a quiet period can take tens of seconds)
 
 The repository has two independent parts:
 
@@ -209,8 +208,14 @@ All configuration comes from environment variables; see [`.env.example`](.env.ex
 
 ### Deployment
 
-The hosted app runs the production image on Azure Container Apps (0.25 vCPU, 0.5 GiB, scale 0–1).
-`robots.txt` keeps crawlers off the per-symbol pages and the API, which otherwise kept the container awake.
+The hosted app runs the production image on Azure Container Apps (0.25 vCPU, 0.5 GiB, one replica kept running).
+It used to scale to zero; Azure's system log showed a wake-up taking ~25 s (6.7 s image pull, 11.5 s
+container creation, then app start), so one replica now stays up and is billed at the idle rate when quiet.
+`robots.txt` keeps crawlers off the per-symbol pages and the API.
+
+Gunicorn preloads the app (`myproject/gunicorn.conf.py`): imports happen once in the master instead of
+in each worker. With the same limits locally, time to the first `/healthz` 200 went from 8.9–11.1 s to
+4.5–4.8 s (3 runs each, 2026-11-24). A `post_fork` hook gives each worker its own yfinance cache directory.
 Before deploying, the image was run locally with the same limits (`--cpus 0.25 --memory 512m`):
 12 pages and API endpoints all returned 200 and memory peaked at 221 MiB (one pass, 2026-11-21).
 

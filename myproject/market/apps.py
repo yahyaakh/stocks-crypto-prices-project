@@ -29,8 +29,9 @@ class MarketConfig(AppConfig):
 def _isolate_yfinance_cache():
     """yfinance keeps SQLite caches (timezones, cookies) in one shared directory. With several
     gunicorn worker processes, concurrent requests then fail with `peewee.OperationalError:
-    database is locked`. ready() runs once per worker process, so a per-PID directory means no
-    two processes ever share a cache file."""
+    database is locked`. Each process gets a per-PID directory, so no two processes ever share
+    a cache file. Called from ready() (runserver, tests) and, because gunicorn preloads the app
+    in the master, again in every worker from gunicorn.conf.py's post_fork hook."""
     import yfinance as yf
 
     path = os.path.join(tempfile.gettempdir(), f"py-yfinance-{os.getpid()}")
