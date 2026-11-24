@@ -10,7 +10,7 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-WARMUP_PATHS = ["/api/indices/", "/api/crypto/", "/api/news/", "/mag7/", "/etfs/", "/ipo/", "/"]
+WARMUP_PATHS = ["/api/indices/", "/api/crypto/", "/api/news/", "/mag7/", "/etfs/", "/ipo/", "/upside/", "/"]
 
 
 class MarketConfig(AppConfig):

@@ -1,6 +1,7 @@
 import logging
 import math
 import re
+from datetime import datetime
 from urllib.parse import urlencode
 
 import yfinance as yf
@@ -16,7 +17,7 @@ from .stocks.stock_prices import (
     get_biggest_etf_stock_prices,
     get_magnificent7_prices,
 )
-from . import symbols
+from . import symbols, upside
 from .news import company_news, market_news
 from .stocks.stocks_home_page import get_world_indices_tables
 from .stocks.stocksOverview import (
@@ -177,6 +178,43 @@ def api_symbols(request):
     """Header-search suggestions: ?q=app -> up to 8 US-listed stocks and ETFs."""
     query = (request.GET.get("q") or "").strip()[:60]
     return JsonResponse({"query": query, "results": symbols.search(query), "source": "Nasdaq Trader symbol directory"})
+
+
+def _upside_context(request) -> dict:
+    """The ranked list for the page and the API. Starts this process's background refresh if it
+    isn't running; before the first build finishes there is nothing to rank yet."""
+    upside.start_background()
+    params = upside.parse_params(request.GET)
+    snap = upside.load()
+    rows, eligible = upside.rank(snap, **params) if snap else ([], 0)
+    meta = {k: snap.get(k) for k in ("targets_at", "prices_at", "universe")} if snap else {}
+    return {"params": params, "rows": rows, "eligible": eligible, "ready": snap is not None, **meta}
+
+
+def _when(stamp: str | None):
+    return datetime.fromisoformat(stamp) if stamp else None
+
+
+@cache_control(max_age=BROWSER_TTL_S)
+@require_GET
+def upside_page(request):
+    ctx = _upside_context(request)
+    ctx["choices"] = {"counts": upside.COUNTS, "analysts": upside.ANALYST_MINIMUMS,
+                      "fresh_days": upside.FRESH_DAYS, "universe_size": upside.UNIVERSE_SIZE}
+    ctx["targets_at"], ctx["prices_at"] = _when(ctx.get("targets_at")), _when(ctx.get("prices_at"))
+    return render(request, "upside.html", ctx)
+
+
+@cache_control(max_age=BROWSER_TTL_S)
+@require_GET
+def api_upside(request):
+    ctx = _upside_context(request)
+    keep = ("symbol", "name", "exchange", "market_cap", "price", "target", "upside_pct", "analysts",
+            "target_mean", "target_median", "target_low", "target_high", "consensus", "recent_count",
+            "last_target_date")
+    ctx["rows"] = [{k: r.get(k) for k in keep} for r in ctx["rows"]]
+    ctx["source"] = "Yahoo Finance analyst consensus"
+    return JsonResponse(sanitize_floats(ctx))
 
 
 @cached(PAGE_TTL_S)

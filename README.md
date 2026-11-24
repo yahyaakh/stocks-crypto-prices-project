@@ -79,12 +79,35 @@ Read these honestly:
 
 Full results, confusion matrices and live examples: [`docs/SENTIMENT_EVAL.md`](docs/SENTIMENT_EVAL.md).
 
+### Analyst upside list
+
+| | result |
+|---|---|
+| full build: 2,000 stocks, 4 parallel requests | **49.1 s and 45.6 s** (2 runs); 1 request failed each time (JSM, HTTP 404); 1,930 stocks have a target |
+| price refresh from the screener (1,999 stocks) | **3.4–4.1 s** (3 runs) |
+| saved snapshot | 542 KB of JSON |
+
+Command: `cd myproject && DEBUG=True python manage.py build_upside` (laptop above, home internet,
+2026-11-24, uncommitted working tree). Build time on the hosted 0.25 vCPU container is not measured yet.
+
+Read these honestly:
+- **I first ranked by a "recent targets" mean built from each firm's latest target, and dropped it.**
+  Those values don't match the consensus after splits, spin-offs and for ADRs: RDY came out at 1,450
+  against a consensus of 14.88, and SNDK at 1,749 against 247. The history is now used only to count how
+  many firms changed or reiterated a target in the last 90 days.
+- Prices were checked against two other Yahoo sources (`fast_info`, `financialData.currentPrice`) for
+  9 stocks, including the top of the list; all matched. The big gaps are real gaps to the consensus, not
+  stale prices.
+- The list is not a tested signal. Only today's targets are available, so there is no backtest. Each day's
+  first build is saved as `targets-YYYY-MM-DD.json`. Those files survive deploys only if `UPSIDE_DATA_DIR`
+  points to a mounted volume; on the hosted app they don't yet.
+
 ### Tests
 
 - Engine: 24/24 test cases, including a differential test that runs 200,000 random operations against
   a slow, obviously correct reference book and stops at the first divergence. CI also runs them under
   AddressSanitizer + UndefinedBehaviorSanitizer.
-- Dashboard: 117 pytest tests (`pytest`, 3.1–3.3 s over three runs on the laptop above). Providers are mocked, so they run in
+- Dashboard: 137 pytest tests (`pytest`, 3.1–4.2 s over three runs on the laptop above). Providers are mocked, so they run in
   CI without API keys; they also all pass with every HTTP(S) request forced through a dead proxy.
 
 ---
@@ -118,6 +141,7 @@ Design notes and the reasoning behind each choice: [`engine/docs/ENGINE_GUIDE.md
 | Stock overview (React), the one page per stock: price chart, key statistics, analyst consensus, 12-month target range, rating changes with each firm's price-target move, monthly recommendation trend, headline tone, company profile | `/live/stock/MSFT` | yfinance, Finnhub |
 | Stock news: up to 60 articles plus the company's own 8-K filings, bullish/neutral/bearish filters, 7-day tone | `/stocknews/?symbol=MSFT` | Finnhub + Yahoo, SEC EDGAR |
 | IPO calendar | `/ipo/` | Finnhub |
+| Analyst upside: the 2,000 largest US-listed stocks ranked by the gap to the consensus price target (or the most downside), top 10–100, filters for analyst count and market cap, the low–high target range, and how many firms updated their target in the last 90 days | `/upside/` | yfinance |
 | Watchlist (React): stocks, ETFs, crypto and indices, prices every 5 s against the previous session's close, list saved in the browser | `/live/` | yfinance |
 
 The header search, `/stock/AAPL` and the retired `/info/` and `/target/` pages all redirect to the overview.
@@ -127,8 +151,8 @@ symbol or company name as you type (`/api/symbols/?q=`), from Nasdaq Trader's da
 mean" list instead of an empty page; indices, currencies, crypto pairs and foreign listings (`^GSPC`,
 `EURUSD=X`, `BTC-USD`, `7203.T`) go straight through to Yahoo.
 
-JSON API under `/api/` (indices, crypto, news, and per-symbol overview, ratings, history, news,
-recommendation trend). See [`myproject/market/urls.py`](myproject/market/urls.py).
+JSON API under `/api/` (indices, crypto, news, the upside list, and per-symbol overview, ratings, history,
+news, recommendation trend). See [`myproject/market/urls.py`](myproject/market/urls.py).
 
 How it works:
 - **News** from Finnhub and Yahoo is merged into one list, de-duplicated by normalised headline
@@ -141,6 +165,13 @@ How it works:
 - **One source per number:** the overview, price targets and rating changes come from yfinance. The
   monthly recommendation trend comes from Finnhub, falling back to Yahoo. Finnhub and Yahoo use different
   broker panels and report different analyst counts, so the page labels the source.
+- **Analyst upside:** Yahoo has no bulk endpoint for price targets: its screener and batch quote return
+  the rating but not the target (checked 2026-11-24). So a background thread builds the list: the
+  screener gives the 2,000 largest US-listed common stocks (ETFs, OTC and preferreds dropped via the
+  Nasdaq directory), then one request per stock fetches the consensus and the per-firm rating history,
+  4 in parallel. Targets are rebuilt daily, prices every 15 minutes from the screener. The result is a
+  JSON file that every gunicorn worker reads; a lock file lets only one process fetch. The page itself
+  only sorts saved data. See *Analyst upside list* under Measured results for timings and limits.
 - **Caching:** server-side per-view cache, browser `max-age=60`.
 - **Concurrency fix:** yfinance keeps SQLite caches in one shared directory, which made concurrent
   gunicorn workers fail with `database is locked`; each worker process now gets its own cache directory.
@@ -215,7 +246,9 @@ All configuration comes from environment variables; see [`.env.example`](.env.ex
 | `SEC_USER_AGENT` | Your name and contact email (`Jane Doe jane@example.com`), required by SEC's fair-access policy. Without it 8-K filings are left out of company news |
 | `GOATCOUNTER_CODE` | Optional. The site code from `https://<code>.goatcounter.com` turns on visitor counts: no cookies, no personal data, described on `/privacy/`. Empty = off |
 | `SENTIMENT_MODEL` | `lexicon` (default) or `finbert` |
-| `CACHE_WARMUP` | `1` pre-fills the cache after startup |
+| `CACHE_WARMUP` | `1` pre-fills the cache after startup (and starts the upside build) |
+| `UPSIDE_DATA_DIR` | Where the upside snapshots are saved (default: the temp folder). Mount a volume here to keep the daily history across deploys |
+| `UPSIDE_BACKGROUND` | `0` turns off the upside refresh thread (tests do this) |
 
 ### Deployment
 
@@ -226,7 +259,7 @@ container creation, then app start), so one replica now stays up and is billed a
 
 Visitor counts (optional) come from GoatCounter, which uses no cookies and stores no IP addresses. Besides page
 views it counts a few actions by name only (search suggestion picked, watchlist add, news article or SEC filing
-opened), never the symbol or text. `/privacy/` describes this.
+opened, upside stock opened or added to the watchlist), never the symbol or text. `/privacy/` describes this.
 
 Gunicorn preloads the app (`myproject/gunicorn.conf.py`): imports happen once in the master instead of
 in each worker. With the same limits locally, time to the first `/healthz` 200 went from 8.9–11.1 s to
@@ -241,7 +274,7 @@ Before deploying, the image was run locally with the same limits (`--cpus 0.25 -
 ```
 engine/            C++ order book: include/, src/, tests/, tools/lobster_replay.cpp, docs/
 myproject/         Django project
-  market/          app: views, urls, news.py, sentiment/, stocks/, providers/, templates/, tests/
+  market/          app: views, urls, news.py, upside.py, sentiment/, stocks/, providers/, templates/, tests/
   static/          built React bundle
 ReactFolder/       React source (stock overview, watchlist)
 scripts/           data downloads (SHA-256 pinned) and the sentiment evaluation

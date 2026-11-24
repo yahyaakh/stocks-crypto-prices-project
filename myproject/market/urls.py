@@ -19,6 +19,7 @@ urlpatterns = [
     path("target/", views.stock_lookup),   # retired page: price targets now on the overview
     path("stocknews/", views.stock_news, name="stocknews"),
     path("ipo/", views.stocks_ipo, name="stocks_ipo"),
+    path("upside/", views.upside_page, name="upside"),
     path("live/", views.live_watch_view, name="Live"),
     # React Router owns everything under /live/ (e.g. /live/stock/MSFT): serve the same shell.
     path("live/<path:rest>", views.live_watch_view),
@@ -28,6 +29,7 @@ urlpatterns = [
     path("api/news/", views.api_news, name="api_news"),
     path("api/get-price/", views.api_get_stock_price, name="api_get_price"),
     path("api/symbols/", views.api_symbols, name="api_symbols"),
+    path("api/upside/", views.api_upside, name="api_upside"),
     path("api/stocks/<str:symbol>/overview/", views.stock_overview_api, name="stock_overview_api"),
     path("api/stocks/<str:symbol>/ratings/", views.analyst_ratings_api, name="analyst_ratings_api"),
     path("api/stocks/<str:symbol>/history/", views.stock_price_history_api, name="stock_history_api"),

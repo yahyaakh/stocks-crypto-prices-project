@@ -41,6 +41,12 @@ GOATCOUNTER_CODE = os.environ.get("GOATCOUNTER_CODE", "").strip().lower()
 if GOATCOUNTER_CODE and not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,49}", GOATCOUNTER_CODE):
     raise ImproperlyConfigured("GOATCOUNTER_CODE must be the code from https://<code>.goatcounter.com")
 
+# Top-upside list (market/upside.py): where the saved snapshots go (default: the temp folder) and
+# whether each process runs the background refresh. A mounted folder keeps the daily history
+# across deploys; the container's own disk is replaced on every deploy.
+UPSIDE_DATA_DIR = os.environ.get("UPSIDE_DATA_DIR", "").strip()
+UPSIDE_BACKGROUND = os.environ.get("UPSIDE_BACKGROUND", "1") != "0"
+
 # News-tone model: "lexicon" (default, tiny) or "finbert" (needs requirements-finbert.txt; +2.3 GB image).
 SENTIMENT_MODEL = os.environ.get("SENTIMENT_MODEL", "lexicon")
 # Created by `python scripts/fetch_sentiment_data.py lexicon` (git-ignored data/ folder).

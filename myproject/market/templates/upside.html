@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% load market_format %}
+{% block title %}Analyst Upside - Market Watch{% endblock %}
+
+{% block content %}
+{% if not ready %}<meta http-equiv="refresh" content="20">{% endif %}
+<div class="upside-page">
+    <header class="upside-head">
+        <h1>Analyst upside</h1>
+        <p>The {{ choices.universe_size|floatformat:"0g" }} largest US-listed stocks, ranked by the gap between the analysts'
+           consensus price target and the current price.</p>
+    </header>
+
+    <form method="get" class="upside-filters" data-autosubmit>
+        <label>Show
+            <select name="n">{% for c in choices.counts %}<option value="{{ c }}" {% if c == params.n %}selected{% endif %}>Top {{ c }}</option>{% endfor %}</select>
+        </label>
+        <label>Rank by
+            <select name="direction">
+                <option value="up" {% if params.direction == "up" %}selected{% endif %}>Most upside</option>
+                <option value="down" {% if params.direction == "down" %}selected{% endif %}>Most downside</option>
+            </select>
+        </label>
+        <label>Target
+            <select name="basis">
+                <option value="mean" {% if params.basis == "mean" %}selected{% endif %}>Mean</option>
+                <option value="median" {% if params.basis == "median" %}selected{% endif %}>Median</option>
+            </select>
+        </label>
+        <label>Analysts, at least
+            <select name="min_analysts">{% for c in choices.analysts %}<option value="{{ c }}" {% if c == params.min_analysts %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+        </label>
+        <label>Market cap
+            <select name="cap">
+                <option value="all" {% if params.cap == "all" %}selected{% endif %}>Any</option>
+                <option value="10b" {% if params.cap == "10b" %}selected{% endif %}>$10B+</option>
+                <option value="50b" {% if params.cap == "50b" %}selected{% endif %}>$50B+</option>
+                <option value="200b" {% if params.cap == "200b" %}selected{% endif %}>$200B+</option>
+            </select>
+        </label>
+        <noscript><button type="submit">Apply</button></noscript>
+    </form>
+
+    {% if not ready %}
+    <article class="upside-building">
+        <strong>Building the list.</strong> The first build after a restart fetches targets for every stock and
+        takes about a minute. This page reloads by itself.
+    </article>
+    {% else %}
+    <p class="upside-status">
+        {% if rows %}Top {{ rows|length }} of {{ eligible|floatformat:"0g" }} stocks that pass the filters{% else %}No stock passes these filters{% endif %}
+        · targets fetched {{ targets_at|date:"j M, H:i" }} UTC · prices updated {{ prices_at|date:"H:i" }} UTC (exchange data is ~15 minutes late)
+    </p>
+
+    {% if rows %}
+    <div class="overflow-auto">
+    <table class="upside-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Stock</th>
+                <th class="num">Price</th>
+                <th class="num">{{ params.basis|capfirst }} target</th>
+                <th class="num">{% if params.direction == "up" %}Upside{% else %}Downside{% endif %}</th>
+                <th>Target range <span class="key"><i class="dot"></i> price <i class="tick"></i> target</span></th>
+                <th class="num">Analysts</th>
+                <th class="num" title="Firms that set or reiterated a target in the last {{ choices.fresh_days }} days">Updated<br>{{ choices.fresh_days }} d</th>
+                <th>Consensus</th>
+                <th class="num">Mkt cap</th>
+                <th><span class="visually-hidden">Watchlist</span></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for r in rows %}
+            <tr>
+                <td class="rank">{{ forloop.counter }}</td>
+                <td class="stock">
+                    <a href="/live/stock/{{ r.symbol }}" data-goatcounter-click="upside-open-stock">{{ r.symbol }}</a>
+                    <small>{{ r.name }}</small>
+                </td>
+                <td class="num">{{ r.price|money }}</td>
+                <td class="num">{{ r.target|money }}</td>
+                <td class="num {{ r.upside_pct|direction }}"><strong>{{ r.upside_pct|signed_pct }}</strong></td>
+                <td class="range">
+                    {% if r.bar %}
+                    <div class="bar" title="Low {{ r.target_low|money }} · High {{ r.target_high|money }}">
+                        <span class="span" style="left: {{ r.bar.low }}%; width: calc({{ r.bar.high }}% - {{ r.bar.low }}%);"></span>
+                        <span class="tick" style="left: {{ r.bar.target }}%;"></span>
+                        <span class="dot" style="left: {{ r.bar.price }}%;"></span>
+                    </div>
+                    <small>{{ r.target_low|money }} – {{ r.target_high|money }}</small>
+                    {% else %}<small>—</small>{% endif %}
+                </td>
+                <td class="num">{{ r.analysts }}</td>
+                <td class="num">
+                    {% if r.recent_count %}{{ r.recent_count }}{% else %}<span class="stale" title="No firm changed or reiterated its target in {{ choices.fresh_days }} days{% if r.last_target_date %}; the latest was on {{ r.last_target_date }}{% endif %}">none</span>{% endif %}
+                </td>
+                <td>{{ r.consensus|default:"—" }}</td>
+                <td class="num">{{ r.market_cap|compact_money }}</td>
+                <td><button type="button" class="watch outline" data-watch="{{ r.symbol }}" title="Add {{ r.symbol }} to your watchlist" aria-label="Add {{ r.symbol }} to your watchlist">+</button></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <section class="upside-notes">
+        <h2>Read before using this list</h2>
+        <ul>
+            <li>Price targets are analysts' opinions about the next 12 months, and on average they are optimistic.</li>
+            <li>A very large gap usually means the price has fallen and the targets have not caught up. Check the range
+                and the "Updated" column: <span class="stale">none</span> means no firm changed or reiterated a target in
+                {{ choices.fresh_days }} days.</li>
+            <li>Few analysts means one opinion can set the whole number. The default hides stocks with fewer than 5.</li>
+            <li>This list has not been tested as a trading signal. Only today's targets are available, so there is no
+                honest backtest yet. Not investment advice.</li>
+        </ul>
+        <p class="src">Targets and prices: Yahoo Finance consensus (mean, median, low, high and analyst count). Stocks:
+           the largest US-listed common shares by market cap, ETFs, OTC and preferred shares excluded. Targets are
+           refreshed daily and prices every 15 minutes.</p>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+    .upside-page { max-width: 1400px; margin: 0 auto; padding: 1rem 0 2rem; }
+    .upside-head h1 { margin-bottom: .35rem; }
+    .upside-head p { color: var(--pico-muted-color); max-width: 48rem; }
+    .upside-filters { display: flex; flex-wrap: wrap; gap: .75rem 1rem; align-items: end; margin: 1.25rem 0 .75rem; }
+    .upside-filters label { font-size: .8rem; color: var(--pico-muted-color); margin: 0; }
+    .upside-filters label { display: flex; flex-direction: column; align-items: flex-start; width: auto; }
+    .upside-filters label select { width: auto; margin: .25rem 0 0; padding-block: .35rem; padding-inline-start: .75rem; height: auto; font-size: .9rem; min-width: 6.5rem; }
+    .upside-filters button { width: auto; margin: 0; }
+    .upside-status { color: var(--pico-muted-color); font-size: .85rem; }
+    .upside-building { border-left: 3px solid var(--pico-primary); }
+
+    .upside-table { font-size: .9rem; }
+    .upside-table th { font-size: .75rem; text-transform: uppercase; letter-spacing: 0; color: var(--pico-muted-color); white-space: nowrap; vertical-align: bottom; }
+    .upside-table td { vertical-align: middle; }
+    .upside-table th, .upside-table td { padding: .5rem .4rem; }
+    .upside-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .upside-table .rank { color: var(--pico-muted-color); }
+    .upside-table .stock a { font-weight: 700; text-decoration: none; }
+    .upside-table .stock small { display: block; color: var(--pico-muted-color); max-width: 13rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .upside-table .positive { color: #22c55e; }
+    .upside-table .negative { color: #ef4444; }
+    .upside-table .stale { color: #f59e0b; }
+    .upside-notes .stale { color: #f59e0b; }
+
+    .upside-table .range { min-width: 8rem; }
+    .upside-table .range small { color: var(--pico-muted-color); font-size: .75rem; white-space: nowrap; }
+    .bar { position: relative; height: .5rem; margin: .2rem 0 .3rem; border-radius: 999px; background: var(--pico-muted-border-color); }
+    .bar .span { position: absolute; top: 0; bottom: 0; border-radius: 999px; background: rgba(1, 170, 255, .45); }
+    .bar .tick { position: absolute; top: -.2rem; width: 2px; height: .9rem; margin-left: -1px; background: var(--pico-primary); }
+    .bar .dot { position: absolute; top: 50%; width: .7rem; height: .7rem; margin: -.35rem 0 0 -.35rem; border-radius: 50%; background: #fff; border: 2px solid var(--pico-background-color); }
+    .key { display: block; text-transform: none; letter-spacing: 0; font-weight: 400; }
+    .key .dot, .key .tick { position: static; display: inline-block; vertical-align: middle; margin: 0 .15rem 0 0; }
+    .key .tick { margin-left: .4rem; }
+    .key .dot { width: .55rem; height: .55rem; border-radius: 50%; background: #fff; }
+    .key .tick { width: 2px; height: .75rem; background: var(--pico-primary); }
+
+    .upside-table button.watch { width: 2rem; height: 2rem; margin: 0; padding: 0; font-size: 1rem; line-height: 1; }
+    .upside-notes { margin-top: 2rem; color: var(--pico-muted-color); font-size: .9rem; }
+    .upside-notes h2 { font-size: 1rem; margin-bottom: .5rem; }
+    .upside-notes li { list-style: disc; }
+    .upside-notes .src { font-size: .8rem; }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+<script>
+// Filters apply as soon as one changes (the Apply button is for no-JS browsers).
+document.querySelectorAll('form[data-autosubmit] select').forEach(function (s) {
+    s.addEventListener('change', function () { s.form.submit(); });
+});
+// "+ Watch" adds the symbol to the live watchlist, which is kept in this browser (same key as /live/).
+(function () {
+    var KEY = 'watchlist.symbols', MAX = 50;
+    function read() {
+        try { var v = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(v) ? v : []; }
+        catch (e) { return null; }
+    }
+    var list = read();
+    function done(btn, sym) {
+        btn.textContent = '✓'; btn.disabled = true;
+        btn.title = sym + ' is in your watchlist';
+        btn.setAttribute('aria-label', btn.title);
+    }
+    document.querySelectorAll('[data-watch]').forEach(function (btn) {
+        var sym = btn.dataset.watch;
+        if (list === null) { btn.hidden = true; return; }            // storage blocked
+        if (list.indexOf(sym) !== -1) done(btn, sym);
+        btn.addEventListener('click', function () {
+            var now = read() || [];
+            if (now.indexOf(sym) === -1) {
+                if (now.length >= MAX) { btn.title = 'Your watchlist is full (' + MAX + ' symbols)'; return; }
+                now.push(sym);
+                try { localStorage.setItem(KEY, JSON.stringify(now)); } catch (e) { btn.title = 'Could not save in this browser'; return; }
+                window.mwCount('upside-watch');
+            }
+            done(btn, sym);
+        });
+    });
+})();
+</script>
+{% endblock %}
