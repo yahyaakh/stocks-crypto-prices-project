@@ -84,7 +84,7 @@ Full results, confusion matrices and live examples: [`docs/SENTIMENT_EVAL.md`](d
 - Engine: 24/24 test cases, including a differential test that runs 200,000 random operations against
   a slow, obviously correct reference book and stops at the first divergence. CI also runs them under
   AddressSanitizer + UndefinedBehaviorSanitizer.
-- Dashboard: 108 pytest tests (`pytest`, 3.2 s on the laptop above). Providers are mocked, so they run in
+- Dashboard: 112 pytest tests (`pytest`, 3.1 s on the laptop above). Providers are mocked, so they run in
   CI without API keys; they also all pass with every HTTP(S) request forced through a dead proxy.
 
 ---
@@ -120,10 +120,11 @@ Design notes and the reasoning behind each choice: [`engine/docs/ENGINE_GUIDE.md
 | IPO calendar | `/ipo/` | Finnhub |
 
 The header search, `/stock/AAPL` and the retired `/info/` and `/target/` pages all redirect to the overview.
-The search suggests US-listed stocks and ETFs by symbol or company name as you type (`/api/symbols/?q=`),
-from Nasdaq Trader's daily symbol directory (about 12,900 listings). A symbol that isn't listed, such as a
-typo, goes to the Research page with suggestions instead of an empty overview; indices, currencies, crypto
-pairs and foreign listings (`^GSPC`, `EURUSD=X`, `BTC-USD`, `7203.T`) go straight through to Yahoo.
+Every symbol box (header, Research, stock news, live watchlist) suggests US-listed stocks and ETFs by
+symbol or company name as you type (`/api/symbols/?q=`), from Nasdaq Trader's daily symbol directory
+(about 12,900 listings). A symbol that isn't listed, such as a typo or a company name, gets a "did you
+mean" list instead of an empty page; indices, currencies, crypto pairs and foreign listings (`^GSPC`,
+`EURUSD=X`, `BTC-USD`, `7203.T`) go straight through to Yahoo.
 
 JSON API under `/api/` (indices, crypto, news, and per-symbol overview, ratings, history, news,
 recommendation trend). See [`myproject/market/urls.py`](myproject/market/urls.py).

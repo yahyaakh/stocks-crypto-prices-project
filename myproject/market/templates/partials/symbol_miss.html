@@ -1,0 +1,14 @@
+{# What was typed is not a symbol. Needs: query, suggestions, link (a URL prefix the symbol is appended to). #}
+<div class="lookup-miss" role="status">
+    {% if suggestions %}
+    <p>No US-listed symbol is exactly <strong>{{ query }}</strong>. Did you mean:</p>
+    <ul>
+        {% for r in suggestions %}
+        <li><a href="{{ link }}{{ r.symbol|urlencode }}"><strong>{{ r.symbol }}</strong> {{ r.name }}</a>
+            <small>{{ r.exchange }}{% if r.etf %} · ETF{% endif %}</small></li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>No US-listed stock or ETF matches <strong>{{ query }}</strong>. Check the symbol, or search by company name.</p>
+    {% endif %}
+</div>

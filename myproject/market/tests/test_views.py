@@ -163,3 +163,23 @@ def test_symbols_api(client):
     assert r.status_code == 200 and "max-age=3600" in r["Cache-Control"]
     assert [x["symbol"] for x in r.json()["results"]] == ["MSFT", "MLGO"]
     assert client.get("/api/symbols/?q=").json()["results"] == []
+
+
+def test_news_page_suggests_for_a_company_name(client, monkeypatch):
+    """Typing a name into the news box gets suggestions linking to news, not a page for "MICROSOFT"."""
+    fetch = mock.Mock()
+    monkeypatch.setattr(views, "company_news", fetch)
+    html = client.get("/stocknews/?symbol=microsoft").content.decode()
+    fetch.assert_not_called()
+    assert "Did you mean" in html and 'href="/stocknews/?symbol=MSFT"' in html
+    assert 'value="microsoft"' in html                         # what was typed stays in the box
+    assert 'data-symbol-suggest="/stocknews/?symbol={symbol}"' in html
+
+
+@pytest.mark.parametrize("typed,shown", [("msft", "MSFT"), ("brk.b", "BRK-B"), ("btc-usd", "BTC-USD")])
+def test_news_page_resolves_symbols(client, monkeypatch, typed, shown):
+    seen = []
+    monkeypatch.setattr(views, "company_news",
+                        lambda s: seen.append(s) or {"articles": [], "window_days": 30, "tone": None, "sources": []})
+    client.get(f"/stocknews/?symbol={typed}")
+    assert seen == [shown]

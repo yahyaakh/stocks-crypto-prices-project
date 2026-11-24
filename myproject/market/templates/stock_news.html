@@ -6,9 +6,13 @@
 <section style="max-width: 1200px; margin: 0 auto;">
 
     <form method="get" role="search" style="max-width: 500px; margin: 0 auto 1.5rem;">
-        <input type="search" name="symbol" value="{{ symbol|default:'' }}" placeholder="Symbol, e.g. MSFT" aria-label="Stock symbol" required>
+        <input type="search" name="symbol" value="{{ symbol|default:query }}" placeholder="Symbol or company, e.g. MSFT or Microsoft"
+               aria-label="Stock symbol or company name" autocomplete="off" spellcheck="false" required
+               data-symbol-suggest="/stocknews/?symbol={symbol}">
         <button type="submit">Show news</button>
     </form>
+
+    {% if query %}<div style="max-width: 500px; margin-bottom: 1.5rem;">{% include "partials/symbol_miss.html" with link="/stocknews/?symbol=" %}</div>{% endif %}
 
     {% if symbol %}
     <header style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:.5rem; margin-bottom:1rem;">

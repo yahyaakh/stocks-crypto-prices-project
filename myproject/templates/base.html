@@ -29,6 +29,11 @@
         .symbol-suggest [role="option"][aria-selected="true"], .symbol-suggest [role="option"]:hover { background: var(--pico-primary-focus); }
         .symbol-suggest .sym { font-weight: 700; min-width: 4.2rem; }
         .symbol-suggest .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lookup-miss { border-left: 3px solid var(--pico-primary); border-radius: 0; padding: .25rem 0 .25rem 1rem; margin-bottom: 1rem; }
+        .lookup-miss p { color: var(--pico-color); margin-bottom: .5rem; }
+        .lookup-miss ul { margin: 0; padding-left: 0; list-style: none; }
+        .lookup-miss li { list-style: none; margin: .2rem 0; }
+        .lookup-miss small { color: var(--pico-muted-color); margin-left: .4rem; }
         .symbol-suggest .exch { color: var(--pico-muted-color); font-size: .75rem; white-space: nowrap; }
     </style>
     {% block extra_head %}{% endblock %}
@@ -63,7 +68,8 @@
 
 <script>
 // Suggestions for every search box marked data-symbol-suggest (US stocks and ETFs from /api/symbols/).
-// Without JS the form still works: the server checks the symbol and redirects.
+// Picking one opens the attribute's URL with {symbol} filled in; the default is the stock overview.
+// Without JS the form still works: the server checks the symbol and suggests matches.
 (function () {
     document.querySelectorAll('input[data-symbol-suggest]').forEach(function (input, n) {
         const form = input.form;
@@ -80,7 +86,8 @@
         input.setAttribute('aria-expanded', 'false');
 
         let items = [], active = -1, timer = null, ctrl = null;
-        const go = sym => { location.href = '/live/stock/' + encodeURIComponent(sym); };
+        const target = input.dataset.symbolSuggest || '/live/stock/{symbol}';
+        const go = sym => { location.href = target.replace('{symbol}', encodeURIComponent(sym)); };
 
         function close() {
             box.hidden = true;

@@ -70,6 +70,24 @@
   margin-bottom: 0;    /* Fixes PicoCSS default margin issue */
 }
 
+/* Symbol suggestions under the watchlist input */
+.suggest-wrap { position: relative; display: flex; width: 300px; max-width: 100%; }
+.suggest-wrap input { width: 100%; }
+.watchlist-suggest {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 20;
+  width: max(100%, 22rem); max-width: 92vw; text-align: left;
+  background: #1e262e; border: 1px solid #333; border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.35); overflow: hidden;
+}
+.watchlist-suggest [role="option"] {
+  display: flex; gap: .6rem; align-items: baseline; padding: .45rem .7rem; cursor: pointer; color: #e5e7eb;
+}
+.watchlist-suggest [role="option"][aria-selected="true"],
+.watchlist-suggest [role="option"]:hover { background: rgba(0,172,193,0.18); }
+.watchlist-suggest .sym { font-weight: 700; min-width: 4.2rem; }
+.watchlist-suggest .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.watchlist-suggest .exch { color: #9ca3af; font-size: .75rem; white-space: nowrap; }
+
 .search-box button {
   padding: 12px 24px;
   background-color: #00acc1;

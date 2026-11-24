@@ -129,6 +129,23 @@ _SYMBOL_RE = re.compile(r"^[A-Z0-9^][A-Z0-9.\-=^]{0,14}$")
 _YAHOO_ONLY_RE = re.compile(r"[\^=]|-USD$|\.[A-Z]{1,3}$")
 
 
+def resolve_symbol(raw: str) -> str | None:
+    """What someone typed in a search box -> the symbol to show, or None when it is not one.
+
+    With Nasdaq's symbol directory loaded, a US symbol must exist ("BRK.B" -> "BRK-B"); Yahoo-only
+    forms (indices, crypto, currencies, foreign listings) pass through. Without the directory
+    (Nasdaq unreachable) any well-formed symbol goes through."""
+    s = raw.strip().upper()
+    if not s:
+        return None
+    if symbols.available():
+        listing = symbols.get(s)
+        if listing:
+            return listing["symbol"]
+        return s if _SYMBOL_RE.match(s) and _YAHOO_ONLY_RE.search(s) else None
+    return s if _SYMBOL_RE.match(s) else None
+
+
 def stock_lookup(request, symbol: str = ""):
     """One stock page: the React overview. The header search (?symbol=), /stock/AAPL and the
     retired /info/ and /target/ pages all land here and redirect to /live/stock/<SYMBOL>.
@@ -138,19 +155,14 @@ def stock_lookup(request, symbol: str = ""):
     anything else (a typo, a company name) goes to the Research page with suggestions instead of
     an empty overview. Without the directory (Nasdaq unreachable) any well-formed symbol goes through."""
     raw = (symbol or request.GET.get("symbol") or "").strip()[:60]
-    s = raw.upper()
-    if not s:
+    if not raw:
         return redirect("stocks")
+    s = resolve_symbol(raw)
+    if s:
+        return redirect(f"/live/stock/{s}")
     if symbols.available():
-        listing = symbols.get(s)
-        if listing:
-            return redirect(f"/live/stock/{listing['symbol']}")
-        if _SYMBOL_RE.match(s) and _YAHOO_ONLY_RE.search(s):
-            return redirect(f"/live/stock/{s}")
         return redirect(reverse("stocks") + "?" + urlencode({"q": raw}))
-    if not _SYMBOL_RE.match(s):
-        return redirect("stocks")
-    return redirect(f"/live/stock/{s}")
+    return redirect("stocks")
 
 
 @cache_control(public=True, max_age=3600)
@@ -163,8 +175,13 @@ def api_symbols(request):
 
 @cached(PAGE_TTL_S)
 def stock_news(request):
-    symbol = _symbol(request)
-    return render(request, "stock_news.html", {"symbol": symbol, **company_news(symbol)})
+    """News for one symbol. A company name or a typo ("microsoft", "AAPLL") gets suggestions instead
+    of an empty page for a symbol that doesn't exist."""
+    raw = (request.GET.get("symbol") or "MSFT").strip()[:60]
+    symbol = resolve_symbol(raw)
+    if symbol is None:
+        return render(request, "stock_news.html", {"symbol": "", "query": raw, "suggestions": symbols.search(raw)})
+    return render(request, "stock_news.html", {"symbol": symbol, "query": "", **company_news(symbol)})
 
 
 @cached(PAGE_TTL_S)

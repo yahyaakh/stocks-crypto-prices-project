@@ -13,9 +13,46 @@ function Watchlist() {
     // (e.g., "Stock not found" or "Server Down").
     // Initial Value: '' (Empty string). This means "No error, everything is fine."
 
+  // Suggestions under the input: US stocks and ETFs matching the symbol or company name typed.
+  const [suggestions, setSuggestions] = useState([])
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(-1)
+
+  useEffect(() => {
+    const q = symbol.trim()
+    if (!q) return
+    const ctrl = new AbortController()
+    const timer = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/symbols/?q=${encodeURIComponent(q)}`, { signal: ctrl.signal })
+        if (!r.ok) return
+        const data = await r.json()
+        setSuggestions(data.results || [])
+        setActive(-1)
+      } catch { /* aborted or offline: the plain input still works */ }
+    }, 150)
+    return () => { clearTimeout(timer); ctrl.abort() }
+  }, [symbol])
+
+  const onType = (value) => {
+    setSymbol(value.toUpperCase())
+    setOpen(Boolean(value.trim()))
+    if (!value.trim()) setSuggestions([])
+  }
+
+  const onKeyDown = (e) => {
+    const shown = open && suggestions.length > 0
+    if (shown && e.key === 'ArrowDown') { e.preventDefault(); setActive((active + 1) % suggestions.length) }
+    else if (shown && e.key === 'ArrowUp') { e.preventDefault(); setActive(active <= 0 ? suggestions.length - 1 : active - 1) }
+    else if (shown && e.key === 'Escape') { e.preventDefault(); setOpen(false) }
+    else if (e.key === 'Enter') { e.preventDefault(); handleAddStock(shown && active >= 0 ? suggestions[active].symbol : symbol) }
+  }
+
   // 1. Function to add a NEW stock
-  const handleAddStock = async () => {
-    if (!symbol) return;
+  const handleAddStock = async (sym = symbol) => {
+    sym = sym.trim().toUpperCase()
+    if (!sym) return;
+    setOpen(false);
     // Without this line, if a user clicked "Add Stock" while the box was empty,
       // the app would send a request to /api/get-price/?symbol=,
       // which would likely crash the backend or return a messy error.
@@ -40,7 +77,7 @@ function Watchlist() {
       // }
 
     try {
-      const response = await fetch(`/api/get-price/?symbol=${symbol}`);
+      const response = await fetch(`/api/get-price/?symbol=${encodeURIComponent(sym)}`);
       const data = await response.json();
 
       // the response should be constant , we do not want it to change
@@ -61,6 +98,7 @@ function Watchlist() {
         } else {
           setWatchlist(prev => [...prev, data]);
           setSymbol('');
+          setSuggestions([]);
         }
       }
     } catch (err) {
@@ -131,14 +169,43 @@ function Watchlist() {
 
 
       <div className="search-box">
-        <input
-          type="text"
-          placeholder="Enter Symbol (e.g., NVDA)"
-          value={symbol}
-          onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-          onKeyPress={(e) => e.key === 'Enter' && handleAddStock()}
-        />
-        <button onClick={handleAddStock} disabled={loading}>
+        <div className="suggest-wrap">
+          <input
+            type="text"
+            placeholder="Symbol or company (e.g., NVDA)"
+            aria-label="Symbol or company name"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-controls="watchlist-suggest"
+            aria-expanded={open && suggestions.length > 0}
+            aria-activedescendant={open && active >= 0 ? `watchlist-suggest-${active}` : undefined}
+            autoComplete="off"
+            spellCheck={false}
+            value={symbol}
+            onChange={(e) => onType(e.target.value)}
+            onKeyDown={onKeyDown}
+            onBlur={() => setOpen(false)}
+            onFocus={() => setOpen(Boolean(symbol.trim()))}
+          />
+          {open && suggestions.length > 0 && (
+            <div id="watchlist-suggest" role="listbox" className="watchlist-suggest">
+              {suggestions.map((r, i) => (
+                <div
+                  key={r.symbol}
+                  id={`watchlist-suggest-${i}`}
+                  role="option"
+                  aria-selected={i === active}
+                  onMouseDown={(e) => { e.preventDefault(); handleAddStock(r.symbol) }}
+                >
+                  <span className="sym">{r.symbol}</span>
+                  <span className="name">{r.name}</span>
+                  <span className="exch">{r.exchange}{r.etf ? ' · ETF' : ''}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <button onClick={() => handleAddStock()} disabled={loading}>
           {loading ? 'Adding...' : 'Add Stock or Crypto'}
         </button>
       </div>
