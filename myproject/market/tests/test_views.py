@@ -199,3 +199,28 @@ def test_news_page_resolves_symbols(client, monkeypatch, typed, shown):
                         lambda s: seen.append(s) or {"articles": [], "window_days": 30, "tone": None, "sources": []})
     client.get(f"/stocknews/?symbol={typed}")
     assert seen == [shown]
+
+
+def test_no_analytics_script_without_a_code(client):
+    html = client.get("/privacy/").content.decode()
+    assert "goatcounter.com/count" not in html and "switched off" in html
+
+
+def test_analytics_script_with_a_code(client, settings):
+    settings.GOATCOUNTER_CODE = "marketwatch"
+    html = client.get("/privacy/").content.decode()
+    assert 'data-goatcounter="https://marketwatch.goatcounter.com/count"' in html
+    assert 'src="https://gc.zgo.at/count.js"' in html and "switched off" not in html
+
+
+def test_bad_goatcounter_code_fails_at_startup(monkeypatch):
+    import importlib
+
+    from django.core.exceptions import ImproperlyConfigured
+
+    import myproject.settings as project_settings
+    monkeypatch.setenv("GOATCOUNTER_CODE", '"><script>')
+    with pytest.raises(ImproperlyConfigured):
+        importlib.reload(project_settings)
+    monkeypatch.setenv("GOATCOUNTER_CODE", "")
+    importlib.reload(project_settings)

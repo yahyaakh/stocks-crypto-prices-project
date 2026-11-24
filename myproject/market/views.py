@@ -81,6 +81,12 @@ Disallow: /target/
 """
 
 
+@cache_control(public=True, max_age=3600)
+@require_GET
+def privacy(request):
+    return render(request, "privacy.html")
+
+
 @require_GET
 def robots_txt(request):
     resp = HttpResponse(ROBOTS_TXT, content_type="text/plain")

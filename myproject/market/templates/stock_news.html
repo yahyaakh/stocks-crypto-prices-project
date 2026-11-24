@@ -45,7 +45,7 @@
                 {% if a.provider == "sec" %}<span class="filing-chip" title="The company's own filing with the SEC; not scored for tone">SEC {{ a.form }}</span>
                 {% elif a.sentiment %}<span class="tone-chip bg-{{ a.sentiment.label }} {{ a.sentiment.label }}">{{ a.sentiment.label }}</span>{% endif %}
             </div>
-            <h3><a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.headline }}</a></h3>
+            <h3><a href="{{ a.url }}" target="_blank" rel="noopener noreferrer" data-goatcounter-click="{% if a.provider == 'sec' %}open-sec-filing{% else %}open-news-article{% endif %}">{{ a.headline }}</a></h3>
             {% if a.summary %}<p class="news-summary">{{ a.summary }}</p>{% endif %}
             {% if a.tickers %}
             <div class="ticker-chips">

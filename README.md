@@ -84,7 +84,7 @@ Full results, confusion matrices and live examples: [`docs/SENTIMENT_EVAL.md`](d
 - Engine: 24/24 test cases, including a differential test that runs 200,000 random operations against
   a slow, obviously correct reference book and stops at the first divergence. CI also runs them under
   AddressSanitizer + UndefinedBehaviorSanitizer.
-- Dashboard: 114 pytest tests (`pytest`, 3.0–5.8 s over three runs on the laptop above). Providers are mocked, so they run in
+- Dashboard: 117 pytest tests (`pytest`, 3.1–3.3 s over three runs on the laptop above). Providers are mocked, so they run in
   CI without API keys; they also all pass with every HTTP(S) request forced through a dead proxy.
 
 ---
@@ -213,6 +213,7 @@ All configuration comes from environment variables; see [`.env.example`](.env.ex
 | `DEBUG`, `ALLOWED_HOSTS`, `LOG_LEVEL` | Usual Django settings |
 | `FINNHUB_API_KEY` | News, IPO calendar, recommendation trends (free tier). Without it those parts are empty |
 | `SEC_USER_AGENT` | Your name and contact email (`Jane Doe jane@example.com`), required by SEC's fair-access policy. Without it 8-K filings are left out of company news |
+| `GOATCOUNTER_CODE` | Optional. The site code from `https://<code>.goatcounter.com` turns on visitor counts: no cookies, no personal data, described on `/privacy/`. Empty = off |
 | `SENTIMENT_MODEL` | `lexicon` (default) or `finbert` |
 | `CACHE_WARMUP` | `1` pre-fills the cache after startup |
 
@@ -222,6 +223,10 @@ The hosted app runs the production image on Azure Container Apps (0.25 vCPU, 0.5
 It used to scale to zero; Azure's system log showed a wake-up taking ~25 s (6.7 s image pull, 11.5 s
 container creation, then app start), so one replica now stays up and is billed at the idle rate when quiet.
 `robots.txt` keeps crawlers off the per-symbol pages and the API.
+
+Visitor counts (optional) come from GoatCounter, which uses no cookies and stores no IP addresses. Besides page
+views it counts a few actions by name only (search suggestion picked, watchlist add, news article or SEC filing
+opened), never the symbol or text. `/privacy/` describes this.
 
 Gunicorn preloads the app (`myproject/gunicorn.conf.py`): imports happen once in the master instead of
 in each worker. With the same limits locally, time to the first `/healthz` 200 went from 8.9–11.1 s to

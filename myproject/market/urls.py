@@ -6,6 +6,7 @@ from . import views
 urlpatterns = [
     path("healthz", views.healthz, name="healthz"),
     path("robots.txt", views.robots_txt, name="robots_txt"),
+    path("privacy/", views.privacy, name="privacy"),
     # HTML pages
     path("", views.home, name="home"),
     path("mag7/", views.magnificent7_view, name="mag7"),

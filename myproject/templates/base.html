@@ -33,9 +33,21 @@
         .lookup-miss p { color: var(--pico-color); margin-bottom: .5rem; }
         .lookup-miss ul { margin: 0; padding-left: 0; list-style: none; }
         .lookup-miss li { list-style: none; margin: .2rem 0; }
+        .site-footer { padding-top: 1rem; padding-bottom: 2rem; color: var(--pico-muted-color); text-align: center; }
         .lookup-miss small { color: var(--pico-muted-color); margin-left: .4rem; }
         .symbol-suggest .exch { color: var(--pico-muted-color); font-size: .75rem; white-space: nowrap; }
     </style>
+    <script>
+    // Counts a named action (e.g. "watchlist-add") when analytics is on; does nothing otherwise.
+    // Only the action's name is sent: never a symbol, search text or anything about the visitor.
+    window.mwCount = function (name) {
+        try { if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({path: name, title: name, event: true}); }
+        catch (e) { /* analytics must never break the page */ }
+    };
+    </script>
+    {% if goatcounter_code %}
+    <script data-goatcounter="https://{{ goatcounter_code }}.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+    {% endif %}
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -66,6 +78,11 @@
     {% block content %}{% endblock %}
 </main>
 
+<footer class="container site-footer">
+    <small>Prices and data from Yahoo Finance, Finnhub, CoinGecko and SEC EDGAR. Not investment advice.
+        · <a href="{% url 'privacy' %}">Privacy</a></small>
+</footer>
+
 <script>
 // Suggestions for every search box marked data-symbol-suggest (US stocks and ETFs from /api/symbols/).
 // Picking one opens the attribute's URL with {symbol} filled in; the default is the stock overview.
@@ -87,7 +104,7 @@
 
         let items = [], active = -1, timer = null, ctrl = null;
         const target = input.dataset.symbolSuggest || '/live/stock/{symbol}';
-        const go = sym => { location.href = target.replace('{symbol}', encodeURIComponent(sym)); };
+        const go = sym => { window.mwCount('search-suggestion'); location.href = target.replace('{symbol}', encodeURIComponent(sym)); };
 
         function close() {
             box.hidden = true;

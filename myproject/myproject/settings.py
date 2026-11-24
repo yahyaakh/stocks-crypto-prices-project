@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+import re
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -33,6 +34,12 @@ FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "")
 # SEC EDGAR needs no key, but its fair-access policy requires a User-Agent naming you and a contact
 # email, e.g. "Jane Doe jane@example.com". Without it the 8-K filings are left out of company news.
 SEC_USER_AGENT = os.environ.get("SEC_USER_AGENT", "").strip()
+
+# Visitor counts from GoatCounter (goatcounter.com): no cookies and no personal data, so no consent
+# banner. The value is the site code from https://<code>.goatcounter.com. Empty = no analytics.
+GOATCOUNTER_CODE = os.environ.get("GOATCOUNTER_CODE", "").strip().lower()
+if GOATCOUNTER_CODE and not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,49}", GOATCOUNTER_CODE):
+    raise ImproperlyConfigured("GOATCOUNTER_CODE must be the code from https://<code>.goatcounter.com")
 
 # News-tone model: "lexicon" (default, tiny) or "finbert" (needs requirements-finbert.txt; +2.3 GB image).
 SENTIMENT_MODEL = os.environ.get("SENTIMENT_MODEL", "lexicon")
@@ -82,6 +89,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'market.context_processors.analytics',
             ],
         },
     },

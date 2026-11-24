@@ -130,6 +130,7 @@ function Watchlist() {
         setError(`${quote.symbol} is already in your watchlist.`)
       } else {
         setWatchlist(prev => [...prev, quote])
+        window.mwCount?.('watchlist-add')
         setSymbol('')
         setSuggestions([])
       }
