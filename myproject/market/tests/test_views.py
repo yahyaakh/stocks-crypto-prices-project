@@ -71,15 +71,31 @@ def test_get_price_unknown_symbol_is_404_not_500(client, monkeypatch):
 
 
 def test_get_price_zero_prev_close_does_not_divide_by_zero(client, monkeypatch):
-    monkeypatch.setattr(views.yf, "Ticker", lambda s: _ticker_with({"last_price": 10.0, "previous_close": 0}))
+    monkeypatch.setattr(views.yf, "Ticker", lambda s: _ticker_with({"last_price": 10.0, "regularMarketPreviousClose": 0}))
     r = client.get("/api/get-price/?symbol=abc")
     assert r.status_code == 200
-    assert r.json() == {"symbol": "ABC", "price": 10.0, "change": None, "change_pct": None}
+    assert r.json() == {"symbol": "ABC", "name": None, "price": 10.0, "change": None, "change_pct": None}
 
 
 def test_get_price_change(client, monkeypatch):
-    monkeypatch.setattr(views.yf, "Ticker", lambda s: _ticker_with({"last_price": 110.0, "previous_close": 100.0}))
+    monkeypatch.setattr(views.yf, "Ticker",
+                        lambda s: _ticker_with({"last_price": 110.0, "regularMarketPreviousClose": 100.0}))
     assert client.get("/api/get-price/?symbol=abc").json()["change_pct"] == 10.0
+
+
+def test_get_price_uses_the_official_previous_close(client, monkeypatch):
+    """AMD on 2026-11-24: fast_info's previous_close said 447.75, the actual close was 453.46."""
+    fast = {"last_price": 412.83, "previous_close": 447.75, "regularMarketPreviousClose": 453.46}
+    monkeypatch.setattr(views.yf, "Ticker", lambda s: _ticker_with(fast))
+    assert client.get("/api/get-price/?symbol=abc").json()["change_pct"] == -8.96
+
+
+def test_get_price_names_listed_symbols(client, monkeypatch):
+    seen = []
+    monkeypatch.setattr(views.yf, "Ticker", lambda s: seen.append(s) or _ticker_with(
+        {"last_price": 500.0, "regularMarketPreviousClose": 490.0}))
+    body = client.get("/api/get-price/?symbol=brk.b").json()
+    assert seen == ["BRK-B"] and body["symbol"] == "BRK-B" and body["name"] == "Berkshire Hathaway Inc."
 
 
 def test_history_bad_period_is_400(client):

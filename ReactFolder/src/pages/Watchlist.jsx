@@ -1,22 +1,105 @@
-import { useState, useEffect } from 'react'
-import '../App.css'
+import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
+import './Watchlist.css'
+
+const STORAGE_KEY = 'watchlist.symbols'
+const REFRESH_MS = 5000
+const STARTERS = ['AAPL', 'NVDA', 'MSFT', 'SPY', 'BTC-USD', 'ETH-USD']
+
+// The list lives in this browser only. Storage can be missing or blocked (private windows), so every
+// access is wrapped and the page still works without it.
+function loadSymbols() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+    return Array.isArray(saved) ? saved.filter(s => typeof s === 'string' && s).slice(0, 50) : []
+  } catch {
+    return []
+  }
+}
+
+function saveSymbols(symbols) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(symbols)) } catch { /* not saved */ }
+}
+
+async function fetchQuote(symbol) {
+  const r = await fetch(`/api/get-price/?symbol=${encodeURIComponent(symbol)}`)
+  const data = await r.json()
+  if (!r.ok || data.error) throw new Error(data.error || `Could not load ${symbol}`)
+  return data
+}
+
+// Stocks and ETFs get their name from the symbol list; other Yahoo symbols get their kind.
+function kindOf(q) {
+  if (q.name) return q.name
+  if (q.symbol.endsWith('-USD')) return 'Crypto'
+  if (q.symbol.startsWith('^')) return 'Index'
+  if (q.symbol.endsWith('=X')) return 'Currency'
+  return ''
+}
+
+const money = v => v == null ? '—' : '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: v < 1 ? 6 : 2 })
+const signed = (v, digits = 2) => (v > 0 ? '+' : '') + v.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })
+
+function QuoteCard({ quote, onRemove }) {
+  const { symbol, price, change, change_pct } = quote
+  const dir = change == null ? '' : change > 0 ? 'up' : change < 0 ? 'down' : ''
+  return (
+    <article className="wl-card">
+      <div className="wl-card-top">
+        <Link to={`/stock/${encodeURIComponent(symbol)}`} className="wl-symbol" title={`Open the ${symbol} overview`}>
+          {symbol}
+        </Link>
+        <button type="button" className="wl-remove" onClick={() => onRemove(symbol)} aria-label={`Remove ${symbol}`}>×</button>
+      </div>
+      <div className="wl-name">{kindOf(quote) || ' '}</div>
+      <div className="wl-price" key={price}>{price == null ? '…' : money(price)}</div>
+      <div className={`wl-change ${dir}`}>
+        {change == null
+          ? (price == null ? 'Loading' : 'No change data')
+          : <>{dir === 'up' ? '▲' : dir === 'down' ? '▼' : ''} {signed(change)} ({signed(change_pct)}%)</>}
+      </div>
+    </article>
+  )
+}
 
 function Watchlist() {
-  const [symbol, setSymbol] = useState('') // The Input Box Memory. It stores whatever text the user is currently typing into the search bar
-  const [watchlist, setWatchlist] = useState([]) //stores the list of all stocks added by the user.
+  const [symbol, setSymbol] = useState('')
+  // [{symbol, name, price, change, change_pct}]; prices are null until the first refresh.
+  const [watchlist, setWatchlist] = useState(() => loadSymbols().map(s => ({ symbol: s, price: null, change: null })))
   const [loading, setLoading] = useState(false)
-    // The Status Flag bool true or false
-    // false: The app is doing nothing (Button says "Add Stock").
-    // true: The app is currently waiting for the server to reply (Button says "Adding...").
   const [error, setError] = useState('')
-    // A text message explaining what went wrong
-    // (e.g., "Stock not found" or "Server Down").
-    // Initial Value: '' (Empty string). This means "No error, everything is fine."
+  const [updatedAt, setUpdatedAt] = useState(null)
 
   // Suggestions under the input: US stocks and ETFs matching the symbol or company name typed.
   const [suggestions, setSuggestions] = useState([])
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
+
+  const symbolsKey = watchlist.map(q => q.symbol).join(',')
+  useEffect(() => { saveSymbols(symbolsKey ? symbolsKey.split(',') : []) }, [symbolsKey])
+
+  // Refresh every price every few seconds while the page is visible. Depends on the list of symbols
+  // only, so a price update doesn't restart the timer.
+  const symbolsRef = useRef([])
+  useEffect(() => {
+    symbolsRef.current = symbolsKey ? symbolsKey.split(',') : []
+  }, [symbolsKey])
+  useEffect(() => {
+    let stopped = false
+    async function refresh() {
+      const list = symbolsRef.current
+      if (!list.length || document.hidden) return
+      const results = await Promise.allSettled(list.map(fetchQuote))
+      if (stopped) return
+      const fresh = new Map()
+      results.forEach(r => { if (r.status === 'fulfilled') fresh.set(r.value.symbol, r.value) })
+      setWatchlist(current => current.map(q => fresh.has(q.symbol) ? { ...q, ...fresh.get(q.symbol) } : q))
+      if (fresh.size) setUpdatedAt(new Date())
+    }
+    const first = setTimeout(refresh, 0)
+    const timer = setInterval(refresh, REFRESH_MS)
+    return () => { stopped = true; clearTimeout(first); clearInterval(timer) }
+  }, [symbolsKey])
 
   useEffect(() => {
     const q = symbol.trim()
@@ -34,168 +117,89 @@ function Watchlist() {
     return () => { clearTimeout(timer); ctrl.abort() }
   }, [symbol])
 
-  const onType = (value) => {
+  const addStock = async (raw = symbol) => {
+    const sym = raw.trim().toUpperCase()
+    if (!sym || loading) return
+    setOpen(false)
+    setError('')
+    if (watchlist.some(q => q.symbol === sym)) { setError(`${sym} is already in your watchlist.`); return }
+    setLoading(true)
+    try {
+      const quote = await fetchQuote(sym)
+      if (watchlist.some(q => q.symbol === quote.symbol)) {
+        setError(`${quote.symbol} is already in your watchlist.`)
+      } else {
+        setWatchlist(prev => [...prev, quote])
+        setSymbol('')
+        setSuggestions([])
+      }
+    } catch (err) {
+      setError(err.message === 'Failed to fetch' ? 'Could not reach the server. Try again.' : err.message)
+    }
+    setLoading(false)
+  }
+
+  const removeStock = sym => setWatchlist(prev => prev.filter(q => q.symbol !== sym))
+
+  const clearAll = () => {
+    if (window.confirm(`Remove all ${watchlist.length} symbols from your watchlist?`)) setWatchlist([])
+  }
+
+  const onType = value => {
     setSymbol(value.toUpperCase())
     setOpen(Boolean(value.trim()))
     if (!value.trim()) setSuggestions([])
   }
 
-  const onKeyDown = (e) => {
+  const onKeyDown = e => {
     const shown = open && suggestions.length > 0
     if (shown && e.key === 'ArrowDown') { e.preventDefault(); setActive((active + 1) % suggestions.length) }
     else if (shown && e.key === 'ArrowUp') { e.preventDefault(); setActive(active <= 0 ? suggestions.length - 1 : active - 1) }
     else if (shown && e.key === 'Escape') { e.preventDefault(); setOpen(false) }
-    else if (e.key === 'Enter') { e.preventDefault(); handleAddStock(shown && active >= 0 ? suggestions[active].symbol : symbol) }
+    else if (e.key === 'Enter') { e.preventDefault(); addStock(shown && active >= 0 ? suggestions[active].symbol : symbol) }
   }
 
-  // 1. Function to add a NEW stock
-  const handleAddStock = async (sym = symbol) => {
-    sym = sym.trim().toUpperCase()
-    if (!sym) return;
-    setOpen(false);
-    // Without this line, if a user clicked "Add Stock" while the box was empty,
-      // the app would send a request to /api/get-price/?symbol=,
-      // which would likely crash the backend or return a messy error.
-      // This line protects the app from doing unnecessary work.
-
-
-    setLoading(true); //The button text instantly changes from "Add Stock" to "Adding...".
-      // It prevents the user from double-clicking.
-      // If they clicked 5 times quickly, you would accidentally add the same stock 5 times.
-      // This "freezes" the button until the work is done.
-    setError('');
-    // It clears out any text inside your error state variable
-      // user d'ont see any old errors
-
-
-      // limit the api calls and number of stocks a user can add to 5
-      // if (watchlist.length >= 5 )
-      // {
-      //     setError("Maximum limit of 5 stocks reached!")
-      //     setLoading(false); // Don't forget to turn off loading!
-      //     return;
-      // }
-
-    try {
-      const response = await fetch(`/api/get-price/?symbol=${encodeURIComponent(sym)}`);
-      const data = await response.json();
-
-      // the response should be constant , we do not want it to change
-      // preventing accidental overwrites. and good practice
-
-      // await is like a "Pause Button"
-      // JavaScript pauses at that line. It basically says:
-        // "I will wait right here until the server replies.
-        // I won't run the next line until I have the data in my hand.
-      // response.json() is important so we can access data.symbol or data.price
-        // to turn the http response data to something JS can use
-
-      if (data.error) {
-        setError(data.error);
-      } else {
-        if (watchlist.some(item => item.symbol === data.symbol)) {
-          setError("Stock already in list!");
-        } else {
-          setWatchlist(prev => [...prev, data]);
-          setSymbol('');
-          setSuggestions([]);
-        }
-      }
-    } catch (err) {
-      setError("Could not connect to Django backend or Invalid Symbol");
-    }
-    setLoading(false);
-  };
-
-  // 2. The "Heartbeat" Effect (Updates prices every 5 seconds)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // We save this timer into a variable named interval
-      // Loop through every stock in the list and get the new price
-      watchlist.forEach(async (stock) => {
-        try {
-            const response = await fetch(`/api/get-price/?symbol=${stock.symbol}`);
-            const updatedData = await response.json();
-            // Update the list with the new data
-            if (!updatedData.error) {
-                setWatchlist(currentList =>
-                    currentList.map(item =>
-                        item.symbol === updatedData.symbol ? updatedData : item
-                    )
-                );
-            }
-        } catch (err) {
-            console.log("Update failed for", stock.symbol);
-        }
-      });
-    }, 5000); // <--- 5000 milliseconds = 5 seconds
-
-    // However, in a real production environment, I would probably increase this to 10 or 15 seconds
-    //  to avoid hitting API Rate Limits (blocking)
-    // from the data provider and to reduce the load on our backend servers."
-
-    // Cleanup: Stop the timer if the user leaves the page
-    return () => clearInterval(interval);
-  }, [watchlist]);
-
-  // 3. Delete function
-  const removeStock = (symbolToRemove) => {
-    setWatchlist(watchlist.filter(s => s.symbol !== symbolToRemove));
-  };
-
-  // remove all function
-
-    const clearAll = () => {
-        setWatchlist([]) ;
-    }
+  const listShown = open && suggestions.length > 0
 
   return (
-    <div className="app-container">
-      <h1 className="title">Live Watchlist</h1>
+    <div className="wl">
+      <header className="wl-head">
+        <h1>Watchlist</h1>
+        <p className="wl-sub">
+          Stocks, ETFs, crypto and indices. Prices update every 5 seconds while this page is open;
+          your list is saved in this browser.
+        </p>
+      </header>
 
-{/*The <strong> keyword is an HTML tag used to define text with strong importance.*/}
-{/*By default, all web browsers render text inside <strong> tags as Bold.*/}
-
-      {/* --- NEW INFO BOX START --- */}
-      <div className="info-box">
-        <p><strong>Welcome to your Real-Time Dashboard!</strong></p>
-        <ul>
-            <li><strong>Track Assets:</strong> Add your favorite Stocks (e.g., AAPL) or Crypto (e.g., BTC-USD).</li>
-            <li><strong>Live Updates:</strong> Prices refresh automatically every <strong>5 seconds</strong>.</li>
-            <li><strong>Stay Ahead:</strong> Monitor market movements instantly without refreshing.</li>
-        </ul>
-      </div>
-      {/* --- NEW INFO BOX END --- */}
-
-
-      <div className="search-box">
-        <div className="suggest-wrap">
+      <form className="wl-form" role="search" onSubmit={e => { e.preventDefault(); addStock() }}>
+        <div className="wl-input-wrap">
           <input
+            className="wl-input"
             type="text"
-            placeholder="Symbol or company (e.g., NVDA)"
+            placeholder="Symbol or company name"
             aria-label="Symbol or company name"
             role="combobox"
             aria-autocomplete="list"
             aria-controls="watchlist-suggest"
-            aria-expanded={open && suggestions.length > 0}
-            aria-activedescendant={open && active >= 0 ? `watchlist-suggest-${active}` : undefined}
+            aria-expanded={listShown}
+            aria-activedescendant={listShown && active >= 0 ? `watchlist-suggest-${active}` : undefined}
             autoComplete="off"
             spellCheck={false}
             value={symbol}
-            onChange={(e) => onType(e.target.value)}
+            onChange={e => onType(e.target.value)}
             onKeyDown={onKeyDown}
             onBlur={() => setOpen(false)}
             onFocus={() => setOpen(Boolean(symbol.trim()))}
           />
-          {open && suggestions.length > 0 && (
-            <div id="watchlist-suggest" role="listbox" className="watchlist-suggest">
+          {listShown && (
+            <div id="watchlist-suggest" role="listbox" className="wl-suggest">
               {suggestions.map((r, i) => (
                 <div
                   key={r.symbol}
                   id={`watchlist-suggest-${i}`}
                   role="option"
                   aria-selected={i === active}
-                  onMouseDown={(e) => { e.preventDefault(); handleAddStock(r.symbol) }}
+                  onMouseDown={e => { e.preventDefault(); addStock(r.symbol) }}
                 >
                   <span className="sym">{r.symbol}</span>
                   <span className="name">{r.name}</span>
@@ -205,70 +209,37 @@ function Watchlist() {
             </div>
           )}
         </div>
-        <button onClick={() => handleAddStock()} disabled={loading}>
-          {loading ? 'Adding...' : 'Add Stock or Crypto'}
-        </button>
-      </div>
+        <button type="submit" className="wl-add" disabled={loading}>{loading ? 'Adding…' : 'Add'}</button>
+      </form>
 
-      {error && <p className="error-msg">{error}</p>}
+      {error && <p className="wl-error" role="alert">{error}</p>}
 
-      <div className="stock-grid">
-          {/*   This is a loop. It goes through every single item inside the watchlist array.*    /}
-{/* Translation: "For every stock in my list, create this HTML structure."*/}
-        {watchlist.map((stock) => (
-
-          <div key={stock.symbol} className="stock-card">
-            <div className="card-header">
-              <h3>{stock.symbol}</h3>
-              <button className="delete-btn" onClick={() => removeStock(stock.symbol)}>×</button>
-
-            </div>
-            {/* Added a key to force animation on change */}
-            <div className="price" key={stock.price}>${stock.price}</div>
-            <div className={`change ${stock.change >= 0 ? 'green' : 'red'}`}>
-              {stock.change > 0 ? '+' : ''}{stock.change} ({stock.change_pct}%)
-            </div>
-
-              {/*this is the remove all stocks button*/}
-              {/*<button onClick={clearAll} className="delete-btn">Clear All</button>*/}
-              {/*show the total number of stocks added and currently live */}
-              {/*<p>Currently Tracking: {watchlist.length} assets </p>*/}
-
+      {watchlist.length === 0 ? (
+        <div className="wl-empty">
+          <p>Your watchlist is empty. Add a symbol above, or start with one of these:</p>
+          <div className="wl-starters">
+            {STARTERS.map(s => (
+              <button key={s} type="button" onClick={() => addStock(s)} disabled={loading}>+ {s}</button>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <>
+          <div className="wl-bar">
+            <span>
+              {watchlist.length} symbol{watchlist.length === 1 ? '' : 's'}
+              {updatedAt && <> · updated {updatedAt.toLocaleTimeString()}</>}
+            </span>
+            <button type="button" className="wl-clear" onClick={clearAll}>Clear all</button>
+          </div>
+          <div className="wl-grid">
+            {watchlist.map(q => <QuoteCard key={q.symbol} quote={q} onRemove={removeStock} />)}
+          </div>
+          <p className="wl-note">Prices from Yahoo Finance; the change is against the previous session's close.</p>
+        </>
+      )}
     </div>
   )
 }
 
 export default Watchlist
-
-
-//
-// key={stock.symbol}
-// What is it? A unique ID tag for React.
-// Why is it needed? React needs to track which items change, are added, or are deleted.
-// If you don't give each item a unique key, React might get confused
-// and re-render the whole list (which is slow) or show bugs.
-
-
-// "useEffect manages the lifecycle of the component to ensure we only start one timer.
-// setInterval creates the loop that fetches new data every 5 seconds.
-// Together, they create the 'live' experience without crashing the browser."
-
-// onClick={...}: This tells React "When someone clicks this element, run the code inside the curly braces.
-
-// () => ...: This is an Arrow Function. It effectively says "Wait until the click happens, THEN run this."
-
-// Interview Tip: If i just write onClick={removeStock(stock.symbol)}
-// (without the arrow function),
-// it would run immediately when the page loads and delete everything instantly.
-// The arrow function prevents that.
-
-
-
-  // useEffect(() => {
-  // What it is: This is a React Hook. It tells React to run some code
-  // after the component has finished rendering .
-  // useEffect acts like a gatekeeper. It ensures the timer starts only
-  // once when the component first loads (or when watchlist changes)

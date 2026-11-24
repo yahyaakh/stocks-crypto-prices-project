@@ -248,10 +248,15 @@ def api_get_stock_price(request):
     symbol = _symbol(request, default="")
     if not symbol:
         return JsonResponse({"error": "No symbol provided"}, status=400)
+    listing = symbols.get(symbol)          # US stocks and ETFs: Yahoo's form ("BRK.B" -> "BRK-B") and a name
+    if listing:
+        symbol = listing["symbol"]
 
     try:
         fast = yf.Ticker(symbol).fast_info
-        price, prev_close = fast["last_price"], fast["previous_close"]
+        # The last session's official close. fast_info's "previous_close" comes from chart data and was
+        # wrong on every symbol checked on 2026-11-24 (AMD $447.75 against an actual close of $453.46).
+        price, prev_close = fast["last_price"], fast["regularMarketPreviousClose"]
     except Exception:
         # yfinance raises (KeyError/HTTPError/...) for unknown tickers instead of returning None.
         logger.info("api_get_stock_price unknown symbol=%s", symbol)
@@ -265,7 +270,8 @@ def api_get_stock_price(request):
         change = round(price - prev_close, 2)
         change_pct = round((price - prev_close) / prev_close * 100, 2)
 
-    return JsonResponse({"symbol": symbol, "price": round(price, 2), "change": change, "change_pct": change_pct})
+    return JsonResponse({"symbol": symbol, "name": listing["name"] if listing else None,
+                         "price": round(price, 2), "change": change, "change_pct": change_pct})
 
 
 @cached(ANALYST_TTL_S)

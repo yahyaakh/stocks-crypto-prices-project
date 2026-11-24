@@ -84,7 +84,7 @@ Full results, confusion matrices and live examples: [`docs/SENTIMENT_EVAL.md`](d
 - Engine: 24/24 test cases, including a differential test that runs 200,000 random operations against
   a slow, obviously correct reference book and stops at the first divergence. CI also runs them under
   AddressSanitizer + UndefinedBehaviorSanitizer.
-- Dashboard: 112 pytest tests (`pytest`, 3.1 s on the laptop above). Providers are mocked, so they run in
+- Dashboard: 114 pytest tests (`pytest`, 3.0–5.8 s over three runs on the laptop above). Providers are mocked, so they run in
   CI without API keys; they also all pass with every HTTP(S) request forced through a dead proxy.
 
 ---
@@ -118,6 +118,7 @@ Design notes and the reasoning behind each choice: [`engine/docs/ENGINE_GUIDE.md
 | Stock overview (React), the one page per stock: price chart, key statistics, analyst consensus, 12-month target range, rating changes with each firm's price-target move, monthly recommendation trend, headline tone, company profile | `/live/stock/MSFT` | yfinance, Finnhub |
 | Stock news: up to 60 articles plus the company's own 8-K filings, bullish/neutral/bearish filters, 7-day tone | `/stocknews/?symbol=MSFT` | Finnhub + Yahoo, SEC EDGAR |
 | IPO calendar | `/ipo/` | Finnhub |
+| Watchlist (React): stocks, ETFs, crypto and indices, prices every 5 s against the previous session's close, list saved in the browser | `/live/` | yfinance |
 
 The header search, `/stock/AAPL` and the retired `/info/` and `/target/` pages all redirect to the overview.
 Every symbol box (header, Research, stock news, live watchlist) suggests US-listed stocks and ETFs by

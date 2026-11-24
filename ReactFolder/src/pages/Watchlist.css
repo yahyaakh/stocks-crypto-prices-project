@@ -1,0 +1,105 @@
+/* Watchlist page. Everything is scoped under .wl and written specifically enough to win over
+   Pico's element styles, which the Django page around the React root loads first. */
+.wl {
+  --wl-card: #1f2937;
+  --wl-border: #374151;
+  --wl-muted: #9ca3af;
+  --wl-text: #e5e7eb;
+  --wl-up: #22c55e;
+  --wl-down: #ef4444;
+  --wl-accent: #0ea5b7;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem 0 2rem;
+}
+
+.wl .wl-head h1 { margin: 0 0 .35rem; font-size: 2rem; font-weight: 700; line-height: 1.2; color: #fff; }
+.wl .wl-sub { margin: 0 0 1.25rem; color: var(--wl-muted); max-width: 46rem; }
+
+/* Add form: input and button in one row, wrapping on narrow screens */
+.wl form.wl-form { display: flex; gap: .5rem; flex-wrap: wrap; max-width: 600px; margin: 0 0 1rem; }
+.wl .wl-input-wrap { position: relative; flex: 1 1 260px; min-width: 0; }
+.wl input.wl-input {
+  width: 100%; margin: 0; height: 2.75rem; padding: 0 .9rem;
+  background: var(--wl-card); color: var(--wl-text); border: 1px solid var(--wl-border); border-radius: 8px;
+}
+.wl input.wl-input:focus { border-color: var(--wl-accent); box-shadow: 0 0 0 3px rgba(14, 165, 183, .25); outline: none; }
+.wl button.wl-add {
+  width: auto; margin: 0; height: 2.75rem; padding: 0 1.4rem; border-radius: 8px; border: none;
+  background: var(--wl-accent); color: #fff; font-weight: 600; cursor: pointer;
+}
+.wl button.wl-add:hover:not(:disabled) { background: #12b8cb; }
+.wl button.wl-add:disabled { opacity: .6; cursor: progress; }
+
+/* Suggestions */
+.wl .wl-suggest {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 20;
+  width: max(100%, 22rem); max-width: 92vw;
+  background: var(--wl-card); border: 1px solid var(--wl-border); border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, .35); overflow: hidden;
+}
+.wl .wl-suggest [role="option"] {
+  display: flex; gap: .6rem; align-items: baseline; padding: .45rem .7rem; cursor: pointer; color: var(--wl-text);
+}
+.wl .wl-suggest [role="option"][aria-selected="true"],
+.wl .wl-suggest [role="option"]:hover { background: rgba(14, 165, 183, .18); }
+.wl .wl-suggest .sym { font-weight: 700; min-width: 4.2rem; }
+.wl .wl-suggest .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl .wl-suggest .exch { color: var(--wl-muted); font-size: .75rem; white-space: nowrap; }
+
+.wl .wl-error { color: #f87171; margin: 0 0 1rem; }
+
+/* Empty state */
+.wl .wl-empty {
+  border: 1px dashed var(--wl-border); border-radius: 12px; padding: 1.5rem; color: var(--wl-muted);
+}
+.wl .wl-empty p { margin: 0 0 .9rem; }
+.wl .wl-starters { display: flex; flex-wrap: wrap; gap: .5rem; }
+.wl .wl-starters button {
+  width: auto; margin: 0; padding: .35rem .8rem; border-radius: 999px; font-size: .9rem; cursor: pointer;
+  background: transparent; color: var(--wl-text); border: 1px solid var(--wl-border);
+}
+.wl .wl-starters button:hover:not(:disabled) { border-color: var(--wl-accent); color: #fff; }
+
+/* Bar above the cards */
+.wl .wl-bar {
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  color: var(--wl-muted); font-size: .875rem; margin-bottom: .75rem;
+}
+.wl button.wl-clear {
+  width: auto; margin: 0; padding: .25rem .7rem; font-size: .85rem; border-radius: 6px; cursor: pointer;
+  background: transparent; color: var(--wl-muted); border: 1px solid var(--wl-border);
+}
+.wl button.wl-clear:hover { color: #fff; border-color: var(--wl-down); }
+
+/* Cards: fixed minimum width, filling the row left to right */
+.wl .wl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1rem; }
+.wl .wl-card {
+  margin: 0; padding: 1rem 1.1rem 1.1rem; border-radius: 12px;
+  background: var(--wl-card); border: 1px solid var(--wl-border); box-shadow: none; color: var(--wl-text);
+  transition: border-color .15s;
+}
+.wl .wl-card:hover { border-color: #4b5563; }
+.wl .wl-card-top { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.wl a.wl-symbol { font-size: 1.15rem; font-weight: 700; color: #fff; text-decoration: none; }
+.wl a.wl-symbol:hover { color: var(--wl-accent); text-decoration: underline; }
+.wl button.wl-remove {
+  width: 1.75rem; height: 1.75rem; margin: 0; padding: 0; line-height: 1; font-size: 1.2rem;
+  border-radius: 6px; border: none; background: transparent; color: var(--wl-muted); cursor: pointer; flex: none;
+}
+.wl button.wl-remove:hover { background: rgba(239, 68, 68, .15); color: var(--wl-down); }
+.wl .wl-name {
+  color: var(--wl-muted); font-size: .8rem; margin-top: .1rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wl .wl-price {
+  font-size: 1.6rem; font-weight: 700; margin: .6rem 0 .15rem; font-variant-numeric: tabular-nums;
+  animation: wl-flash .6s ease-out;
+}
+.wl .wl-change { font-size: .9rem; color: var(--wl-muted); font-variant-numeric: tabular-nums; }
+.wl .wl-change.up { color: var(--wl-up); }
+.wl .wl-change.down { color: var(--wl-down); }
+.wl .wl-note { color: #6b7280; font-size: .8rem; margin: 1rem 0 0; }
+
+@keyframes wl-flash { from { opacity: .45; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .wl .wl-price { animation: none; } }
